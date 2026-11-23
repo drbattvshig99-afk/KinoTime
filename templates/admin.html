@@ -1,0 +1,94 @@
+
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Админ удирдлага</h1>
+
+<div class="panel">
+  <h2>Кино нэмэх</h2>
+
+  <form method="post" action="/admin/add" enctype="multipart/form-data">
+
+    <label>Киноны нэр</label>
+    <input name="title" required>
+
+    <label>Тайлбар</label>
+    <textarea name="description"></textarea>
+
+    <label>Ангилал</label>
+    <input name="category" placeholder="Хайр дурлал, түүхэн...">
+
+    <label>Постерын зургийн URL</label>
+    <input name="poster">
+
+    <label>Видео оруулах хэлбэр</label>
+    <select name="source_type" id="stype"
+      onchange="
+        document.getElementById('urlbox').style.display =
+          this.value === 'file' ? 'none' : 'block';
+        document.getElementById('filebox').style.display =
+          this.value === 'file' ? 'block' : 'none';
+      ">
+      <option value="youtube">YouTube embed URL</option>
+      <option value="embed">Гадаад сайтын embed URL</option>
+      <option value="file">Видео файл</option>
+    </select>
+
+    <div id="urlbox">
+      <label>Видео холбоос</label>
+      <input name="source"
+        placeholder="https://www.youtube.com/embed/...">
+    </div>
+
+    <div id="filebox" style="display:none">
+      <label>Видео файл</label>
+      <input type="file" name="video" accept="video/*">
+    </div>
+
+    <label>
+      <input type="checkbox" name="paid">
+      Төлбөртэй кино
+    </label>
+
+    <button type="submit">Кино нэмэх</button>
+  </form>
+</div>
+
+<h2>Кинонууд</h2>
+
+{% for m in movies %}
+<div class="row">
+  <span>
+    {{ m.title }} -
+    {% if m.paid %}Төлбөртэй{% else %}Үнэгүй{% endif %}
+  </span>
+  <a href="/admin/delete/{{ m.id }}"
+     onclick="return confirm('Устгах уу?')">Устгах</a>
+</div>
+{% endfor %}
+
+<h2>Төлбөрийн хүсэлт</h2>
+
+{% for p in payments %}
+<div class="row">
+  <span>
+    {{ p.username }} - {{ p.title }}
+    {{ p.method }} - {{ p.status }}
+
+    {% if p.proof %}
+    <a href="/static/uploads/{{ p.proof }}" target="_blank">
+      Баримт
+    </a>
+    {% endif %}
+  </span>
+
+  <span>
+    <a href="/admin/payment/{{ p.id }}/approve">Зөвшөөрөх</a>
+    <a href="/admin/payment/{{ p.id }}/reject">Татгалзах</a>
+  </span>
+</div>
+{% else %}
+<p>Одоогоор хүсэлт алга.</p>
+{% endfor %}
+
+{% endblock %}
