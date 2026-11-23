@@ -1,94 +1,161 @@
-
 {% extends "base.html" %}
+
 {% block content %}
+<style>
+    .admin-card {
+        background: #14161d;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+    .form-control, .form-select {
+        background-color: #1c1f29;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border-radius: 8px;
+        padding: 10px 12px;
+    }
+    .form-control:focus, .form-select:focus {
+        background-color: #222632;
+        border-color: #ff2a5f;
+        color: #ffffff;
+        box-shadow: none;
+    }
+    .form-control::placeholder {
+        color: #6c757d;
+    }
+    .form-label {
+        font-size: 0.88rem;
+        color: #adb5bd;
+        margin-bottom: 5px;
+    }
+</style>
 
-<h1>Админ удирдлага</h1>
+<div class="container mt-3 pb-5">
+    <h3 class="fw-bold mb-4">⚙️ Админ удирдлага</h3>
 
-<div class="panel">
-  <h2>Кино нэмэх</h2>
-
-  <form method="post" action="/admin/add" enctype="multipart/form-data">
-
-    <label>Киноны нэр</label>
-    <input name="title" required>
-
-    <label>Тайлбар</label>
-    <textarea name="description"></textarea>
-
-    <label>Ангилал</label>
-    <input name="category" placeholder="Хайр дурлал, түүхэн...">
-
-    <label>Постерын зургийн URL</label>
-    <input name="poster">
-
-    <label>Видео оруулах хэлбэр</label>
-    <select name="source_type" id="stype"
-      onchange="
-        document.getElementById('urlbox').style.display =
-          this.value === 'file' ? 'none' : 'block';
-        document.getElementById('filebox').style.display =
-          this.value === 'file' ? 'block' : 'none';
-      ">
-      <option value="youtube">YouTube embed URL</option>
-      <option value="embed">Гадаад сайтын embed URL</option>
-      <option value="file">Видео файл</option>
-    </select>
-
-    <div id="urlbox">
-      <label>Видео холбоос</label>
-      <input name="source"
-        placeholder="https://www.youtube.com/embed/...">
+    <!-- Кино нэмэх хэсэг -->
+    <div class="admin-card">
+        <h5 class="fw-bold mb-3 text-danger">➕ Шинэ кино нэмэх</h5>
+        <form action="{{ url_for('add_movie') }}" method="POST" enctype="multipart/form-data">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Киноны нэр</label>
+                    <input type="text" name="title" class="form-control" placeholder="Жишээ: Аватар 2" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Ангилал</label>
+                    <input type="text" name="category" class="form-control" placeholder="Хайр дурлал, түүхэн, тулаант...">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Тайлбар</label>
+                    <textarea name="description" class="form-control" rows="2" placeholder="Киноны товч агуулга..."></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Постерын зургийн URL</label>
+                    <input type="text" name="poster" class="form-control" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Видео оруулах хэлбэр</label>
+                    <select name="source_type" class="form-select">
+                        <option value="youtube">YouTube embed URL</option>
+                        <option value="url">Шууд видео линк (MP4 / Embed)</option>
+                        <option value="file">Файл хуулах (MP4)</option>
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Видео холбоос (эсвэл доороос файл сонгоно)</label>
+                    <input type="text" name="source" class="form-control" placeholder="https://youtube.com...">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Видео файл (хэрэв файл хуулах бол)</label>
+                    <input type="file" name="video" class="form-control">
+                </div>
+                <div class="col-12 d-flex justify-content-between align-items-center mt-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="paid" id="paidCheck">
+                        <label class="form-check-label text-warning fw-semibold" for="paidCheck">
+                            👑 Төлбөртэй (VIP) кино болгох
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-modern px-4">Кино нэмэх</button>
+                </div>
+            </div>
+        </form>
     </div>
 
-    <div id="filebox" style="display:none">
-      <label>Видео файл</label>
-      <input type="file" name="video" accept="video/*">
+    <!-- Төлбөрийн хүсэлтүүд -->
+    <div class="admin-card">
+        <h5 class="fw-bold mb-3 text-warning">💳 Төлбөрийн хүсэлтүүд</h5>
+        {% if payments %}
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead>
+                    <tr class="text-secondary small">
+                        <th>Хэрэглэгч</th>
+                        <th>Кино</th>
+                        <th>Хэлбэр</th>
+                        <th>Баримт</th>
+                        <th>Төлөв</th>
+                        <th>Үйлдэл</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td class="fw-bold">{{ p['username'] }}</td>
+                        <td>{{ p['title'] }}</td>
+                        <td>{{ p['method'] }}</td>
+                        <td>
+                            {% if p['proof'] %}
+                                <a href="{{ url_for('uploaded', name=p['proof']) }}" target="_blank" class="btn btn-glass btn-sm">Зураг үзэх</a>
+                            {% else %}
+                                <span class="text-muted small">Байхгүй</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p['status'] == 'approved' %}
+                                <span class="badge bg-success">Батлагдсан</span>
+                            {% elif p['status'] == 'rejected' %}
+                                <span class="badge bg-danger">Татгалзсан</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Хүлээгдэж буй</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('payment_action', pid=p['id'], action='approve') }}" class="btn btn-success btn-sm">Батлах</a>
+                            <a href="{{ url_for('payment_action', pid=p['id'], action='reject') }}" class="btn btn-outline-danger btn-sm">Цуцлах</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="text-secondary mb-0">Одоогоор төлбөрийн хүсэлт алга байна.</p>
+        {% endif %}
     </div>
 
-    <label>
-      <input type="checkbox" name="paid">
-      Төлбөртэй кино
-    </label>
-
-    <button type="submit">Кино нэмэх</button>
-  </form>
+    <!-- Нэмэгдсэн кинонууд -->
+    <div class="admin-card">
+        <h5 class="fw-bold mb-3">🎬 Нийт кинонууд ({{ movies|length }})</h5>
+        {% if movies %}
+        <div class="list-group list-group-flush">
+            {% for m in movies %}
+            <div class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center px-0">
+                <div>
+                    <span class="fw-semibold">{{ m['title'] }}</span>
+                    <span class="badge bg-secondary ms-2">{{ m['category'] }}</span>
+                    {% if m['paid'] %}<span class="badge bg-warning text-dark ms-1">VIP</span>{% endif %}
+                </div>
+                <a href="{{ url_for('delete_movie', mid=m['id']) }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('Устгах уу?')">Устгах</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+            <p class="text-secondary mb-0">Кино нэмэгдээгүй байна.</p>
+        {% endif %}
+    </div>
 </div>
-
-<h2>Кинонууд</h2>
-
-{% for m in movies %}
-<div class="row">
-  <span>
-    {{ m.title }} -
-    {% if m.paid %}Төлбөртэй{% else %}Үнэгүй{% endif %}
-  </span>
-  <a href="/admin/delete/{{ m.id }}"
-     onclick="return confirm('Устгах уу?')">Устгах</a>
-</div>
-{% endfor %}
-
-<h2>Төлбөрийн хүсэлт</h2>
-
-{% for p in payments %}
-<div class="row">
-  <span>
-    {{ p.username }} - {{ p.title }}
-    {{ p.method }} - {{ p.status }}
-
-    {% if p.proof %}
-    <a href="/static/uploads/{{ p.proof }}" target="_blank">
-      Баримт
-    </a>
-    {% endif %}
-  </span>
-
-  <span>
-    <a href="/admin/payment/{{ p.id }}/approve">Зөвшөөрөх</a>
-    <a href="/admin/payment/{{ p.id }}/reject">Татгалзах</a>
-  </span>
-</div>
-{% else %}
-<p>Одоогоор хүсэлт алга.</p>
-{% endfor %}
-
 {% endblock %}
