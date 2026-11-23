@@ -1,1 +1,26 @@
-{% extends "base.html" %}{% block content %}<section class="hero"><p class="eyebrow">ТАНЫ КИНО ЕРТӨНЦ</p><h1>Дуртай киногоо<br><span>эндээс үзээрэй.</span></h1><p>Монгол хэл дээрх богино драм, олон ангит кино.</p></section><h2>Шинээр нэмэгдсэн</h2><div class="grid">{% for m in movies %}<a class="tile" href="/movie/{{m.id}}"><div class="poster">{% if m.poster %}<img src="{{m.poster}}">{% else %}<b>KinoTime</b>{% endif %}</div><h3>{{m.title}}</h3><p>{{m.category}} · {% if m.paid %}Төлбөртэй{% else %}Үнэгүй{% endif %}</p></a>{% else %}<p>Одоогоор кино нэмэгдээгүй байна.</p>{% endfor %}</div>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-white mb-4">🎬 Шинээр нэмэгдсэн кинонууд</h2>
+    
+    <div class="row">
+        {% for movie in movies %}
+        <div class="col-6 col-md-3 mb-4">
+            <div class="card bg-dark text-white h-100 border-secondary">
+                <img src="{{ movie.poster_url or movie.image_url }}" class="card-img-top" alt="{{ movie.title }}" style="height: 300px; object-fit: cover;">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ movie.title }}</h5>
+                    <p class="card-text text-muted small">{{ movie.genre }} • {{ movie.year }}</p>
+                    <a href="/movie/{{ movie.id }}" class="btn btn-danger mt-auto w-100">Үзэх</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center text-muted py-5">
+            <p>Одоогоор кино нэмэгдээгүй байна.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
