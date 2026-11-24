@@ -3,18 +3,23 @@
 
 <style>
 .payment-card {
-    max-width: 550px;
-    margin: 30px auto;
+    max-width: 500px;
+    margin: 20px auto;
     background: #151522;
     border: 1px solid rgba(255,255,255,.08);
-    border-radius: 18px;
-    padding: 25px;
+    border-radius: 16px;
+    padding: 20px;
 }
-.payment-title { color: #bd8aff; font-weight: 700; }
+.payment-title {
+    color: #bd8aff;
+    font-weight: 700;
+    font-size: 22px;
+}
 .form-control, .form-select {
     background: #222235;
     color: white;
     border: 1px solid #41415a;
+    border-radius: 9px;
 }
 .form-control:focus, .form-select:focus {
     background: #222235;
@@ -22,30 +27,63 @@
     border-color: #a855f7;
     box-shadow: none;
 }
+.form-select option {
+    background: #222235;
+    color: white;
+}
 .btn-purple {
     background: #914bdc;
     color: white;
     border: none;
+    border-radius: 9px;
 }
-.btn-purple:hover { background: #7434b8; color: white; }
+.btn-purple:hover {
+    background: #7434b8;
+    color: white;
+}
+.payment-info {
+    background: #222235;
+    border: 1px solid rgba(255,255,255,.08);
+    color: white;
+    border-radius: 10px;
+    padding: 13px;
+    margin-bottom: 18px;
+}
 </style>
 
 <div class="container py-3">
-
     <div class="payment-card">
+
         <h3 class="payment-title mb-4">💳 ТӨЛБӨРИЙН ХҮСЭЛТ</h3>
 
         {% if movie %}
-            <div class="alert alert-info">
-                🎬 Кино: <strong>{{ movie.title }}</strong>
+            <div class="payment-info">
+                🎬 Кино:
+                <strong>{{ movie.title }}</strong>
             </div>
         {% else %}
-            <div class="alert alert-warning">
-                👑 1 сарын VIP эрх — 30 хоног
+            {% set current_plan = request.args.get('plan', '1m') %}
+
+            <div class="payment-info">
+                👑 VIP эрхийн төлбөр
+
+                <div class="mt-2">
+                    <label class="form-label">VIP багцаа сонгоно уу</label>
+                    <select class="form-select" name="plan" id="planSelect" form="paymentForm">
+                        <option value="1m" {% if current_plan == '1m' %}selected{% endif %}>1 сар — 11,999₮</option>
+                        <option value="3m" {% if current_plan == '3m' %}selected{% endif %}>3 сар — 25,999₮</option>
+                        <option value="6m" {% if current_plan == '6m' %}selected{% endif %}>6 сар — 35,999₮</option>
+                        <option value="1y" {% if current_plan == '1y' %}selected{% endif %}>1 жил — 49,999₮</option>
+                    </select>
+                </div>
             </div>
         {% endif %}
 
-        <form method="POST">
+        <form method="POST" id="paymentForm">
+
+            {% if movie %}
+                <input type="hidden" name="plan" value="single">
+            {% endif %}
 
             <label class="form-label text-light">Төлбөрийн арга</label>
             <select class="form-select mb-3" name="method" required>
@@ -55,18 +93,22 @@
             </select>
 
             <label class="form-label text-light">Төлсөн дүн (₮)</label>
-            <input class="form-control mb-3"
-                   type="number"
-                   name="amount"
-                   min="1"
-                   placeholder="Төлсөн дүнгээ оруулна уу"
-                   required>
+            <input
+                class="form-control mb-3"
+                type="number"
+                name="amount"
+                min="1"
+                placeholder="Төлсөн дүнгээ оруулна уу"
+                required
+            >
 
             <label class="form-label text-light">Гүйлгээний баримт / мэдээлэл</label>
-            <textarea class="form-control mb-3"
-                      name="proof"
-                      rows="4"
-                      placeholder="Гүйлгээний утга, баримтын холбоос эсвэл мэдээлэл"></textarea>
+            <textarea
+                class="form-control mb-3"
+                name="proof"
+                rows="4"
+                placeholder="Гүйлгээний утга, баримтын холбоос эсвэл мэдээлэл"
+            ></textarea>
 
             <button type="submit" class="btn btn-purple w-100 py-2">
                 Хүсэлт илгээх
@@ -76,7 +118,8 @@
         <a href="{{ url_for('index') }}" class="btn btn-outline-light w-100 mt-3">
             Буцах
         </a>
-    </div>
 
+    </div>
 </div>
+
 {% endblock %}
