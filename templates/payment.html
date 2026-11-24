@@ -61,14 +61,15 @@
         <!-- Дансны мэдээлэл -->
         <div class="bank-box mb-4">
             <div class="small text-secondary mb-1">Шилжүүлэх данс (Хаан Банк):</div>
-            <div class="fw-bold fs-5 text-white">5000000000</div>
-            <div class="small text-light">Хүлээн авагч: <b>Таны Нэр</b></div>
-            <div class="small text-warning mt-1">Гүйлгээний утга дээр: <b>{{ session.get('username') }}</b> гэж бичнэ үү.</div>
+            <div class="small text-light">IBAN: <b class="text-white">45000500</b></div>
+            <div class="fw-bold fs-5 text-white my-1">5193119236</div>
+            <div class="small text-light">Хүлээн авагч: <b>BATTUSHIG MUNKHZAYA</b></div>
+            <div class="small text-warning mt-2">Гүйлгээний утга дээр: <b>{{ session.get('username') }}</b> гэж бичнэ үү.</div>
         </div>
 
         <form method="POST" enctype="multipart/form-data">
             <div class="mb-3">
-                <label class="form-label small text-secondary">Сонгосон багц / Хэлбэр</label>
+                <label class="form-label small text-secondary">Сонгосон багц</label>
                 <select name="method" class="form-select bg-dark text-white border-secondary" required>
                     <option value="1 Сар - 4,000₮">1 Сар — 4,000₮</option>
                     <option value="3 Сар - 12,000₮">3 Сар — 12,000₮</option>
