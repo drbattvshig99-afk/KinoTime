@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.membership-wrap {
+    max-width: 1000px;
+    margin: auto;
+    padding: 22px 12px;
+}
+.membership-title {
+    color: #b98aff;
+    font-size: 25px;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 8px;
+}
+.membership-subtitle {
+    color: #aaa;
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: 25px;
+}
+.plan-card {
+    background: #151522;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px;
+    padding: 20px 15px;
+    height: 100%;
+    text-align: center;
+    transition: .2s;
+}
+.plan-card:hover {
+    transform: translateY(-3px);
+    border-color: #a855f7;
+}
+.plan-card.featured {
+    border: 1px solid #a855f7;
+}
+.plan-name {
+    color: white;
+    font-size: 17px;
+    font-weight: 700;
+}
+.plan-price {
+    color: #c084fc;
+    font-size: 27px;
+    font-weight: 800;
+    margin: 13px 0 4px;
+}
+.plan-duration {
+    color: #aaa;
+    font-size: 12px;
+    margin-bottom: 17px;
+}
+.plan-feature {
+    color: #ddd;
+    font-size: 13px;
+    margin: 8px 0;
+}
+.plan-button {
+    display: block;
+    width: 100%;
+    background: #8b45d9;
+    color: white;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 18px;
+}
+.plan-button:hover {
+    background: #7132b8;
+    color: white;
+}
+.membership-note {
+    color: #aaa;
+    text-align: center;
+    font-size: 12px;
+    margin-top: 22px;
+}
+@media(max-width: 576px) {
+    .membership-title {
+        font-size: 21px;
+    }
+    .plan-card {
+        padding: 16px 12px;
+    }
+    .plan-price {
+        font-size: 24px;
+    }
+}
+</style>
+
+<div class="membership-wrap">
+
+    <h2 class="membership-title">👑 KINOTIME VIP ГИШҮҮНЧЛЭЛ</h2>
+
+    <p class="membership-subtitle">
+        Өөрт тохирох багцаа сонгоод VIP кинонуудаа үзээрэй.
+    </p>
+
+    <div class="row g-3">
+
+        <!-- НЭГ КИНО -->
+        <div class="col-12 col-sm-6 col-lg-4">
+            <div class="plan-card">
+                <div class="plan-name">🎬 Нэг кино</div>
+                <div class="plan-price">4,000₮</div>
+                <div class="plan-duration">Сонгосон кино — 24 цаг</div>
+
+                <div class="plan-feature">✓ Нэг кино үзэх эрх</div>
+                <div class="plan-feature">✓ 24 цаг хүчинтэй</div>
+
+                <a href="{{ url_for('all_movies') }}" class="plan-button">
+                    Кино сонгох
+                </a>
+            </div>
+        </div>
+
+        <!-- 1 САР -->
+        <div class="col-12 col-sm-6 col-lg-4">
+            <div class="plan-card">
+                <div class="plan-name">🥉 1 сарын VIP</div>
+                <div class="plan-price">11,999₮</div>
+                <div class="plan-duration">30 хоног</div>
+
+                <div class="plan-feature">✓ VIP бүх кино үзэх</div>
+                <div class="plan-feature">✓ 30 хоног хүчинтэй</div>
+
+                <a href="{{ url_for('payment', mid=0) }}?plan=1m"
+                   class="plan-button">
+                    Эрх авах
+                </a>
+            </div>
+        </div>
+
+        <!-- 3 САР -->
+        <div class="col-12 col-sm-6 col-lg-4">
+            <div class="plan-card featured">
+                <div class="plan-name">🥈 3 сарын VIP</div>
+                <div class="plan-price">25,999₮</div>
+                <div class="plan-duration">90 хоног</div>
+
+                <div class="plan-feature">✓ VIP бүх кино үзэх</div>
+                <div class="plan-feature">✓ 90 хоног хүчинтэй</div>
+
+                <a href="{{ url_for('payment', mid=0) }}?plan=3m"
+                   class="plan-button">
+                    Эрх авах
+                </a>
+            </div>
+        </div>
+
+        <!-- 6 САР -->
+        <div class="col-12 col-sm-6 col-lg-6">
+            <div class="plan-card">
+                <div class="plan-name">🥇 6 сарын VIP</div>
+                <div class="plan-price">35,999₮</div>
+                <div class="plan-duration">180 хоног</div>
+
+                <div class="plan-feature">✓ VIP бүх кино үзэх</div>
+                <div class="plan-feature">✓ 180 хоног хүчинтэй</div>
+
+                <a href="{{ url_for('payment', mid=0) }}?plan=6m"
+                   class="plan-button">
+                    Эрх авах
+                </a>
+            </div>
+        </div>
+
+        <!-- 1 ЖИЛ -->
+        <div class="col-12 col-sm-6 col-lg-6">
+            <div class="plan-card">
+                <div class="plan-name">💎 1 жилийн VIP</div>
+                <div class="plan-price">49,999₮</div>
+                <div class="plan-duration">365 хоног</div>
+
+                <div class="plan-feature">✓ VIP бүх кино үзэх</div>
+                <div class="plan-feature">✓ 365 хоног хүчинтэй</div>
+
+                <a href="{{ url_for('payment', mid=0) }}?plan=1y"
+                   class="plan-button">
+                    Эрх авах
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <p class="membership-note">
+        Төлбөрийн хүсэлт илгээсний дараа админ шалгаж VIP эрхийг идэвхжүүлнэ.
+    </p>
+
+</div>
+
+{% endblock %}
