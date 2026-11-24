@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.profile-card {
+    background: #151522;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 18px;
+    padding: 22px;
+    margin-bottom: 20px;
+}
+.profile-title { color: #bd8aff; font-weight: 700; }
+.profile-value { color: white; font-size: 20px; font-weight: 600; }
+.table { color: #eee; }
+.table th { color: #bd8aff; }
+.vip-box {
+    background: linear-gradient(135deg,#54238a,#24133f);
+    border-radius: 16px;
+    padding: 25px;
+}
+</style>
+
+<div class="container py-4">
+
+    <h2 class="profile-title mb-4">👤 МИНИЙ ПРОФАЙЛ</h2>
+
+    <div class="profile-card">
+        <div class="text-secondary">Хэрэглэгчийн нэр</div>
+        <div class="profile-value">{{ user.username }}</div>
+    </div>
+
+    <div class="vip-box mb-4">
+        <h4 class="text-white">👑 VIP ЭРХ</h4>
+
+        {% if vip.days > 0 %}
+            <h2 class="text-white">{{ vip.days }} хоног</h2>
+            <p class="text-light mb-1">Таны VIP эрх идэвхтэй байна.</p>
+        {% else %}
+            <h4 class="text-white">VIP эрх идэвхгүй</h4>
+            <p class="text-light">VIP эрх авахын тулд хүсэлт илгээнэ үү.</p>
+        {% endif %}
+
+        <p class="text-light mb-1">Эхэлсэн: {{ user.vip_started_at or '-' }}</p>
+        <p class="text-light">Дуусах: {{ user.vip_until or '-' }}</p>
+
+        <a href="{{ url_for('payment', mid=0) }}" class="btn btn-light mt-2">
+            VIP эрх авах
+        </a>
+    </div>
+
+    <div class="profile-card">
+        <h5 class="profile-title mb-3">💳 Төлбөрийн түүх</h5>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Төрөл</th>
+                        <th>Дүн</th>
+                        <th>Төлөв</th>
+                        <th>Огноо</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in payments %}
+                    <tr>
+                        <td>
+                            {% if p.request_type == 'vip' %}
+                                1 сарын VIP
+                            {% else %}
+                                Кино үзэх
+                            {% endif %}
+                        </td>
+                        <td>{{ p.amount }}₮</td>
+                        <td>
+                            {% if p.status == 'approved' %}
+                                <span class="badge bg-success">Зөвшөөрсөн</span>
+                            {% elif p.status == 'rejected' %}
+                                <span class="badge bg-danger">Татгалзсан</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Хүлээгдэж буй</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.created_at }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4">Төлбөрийн түүх байхгүй.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="profile-card">
+        <h5 class="profile-title mb-3">🎬 Үзсэн киноны түүх</h5>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Кино</th>
+                        <th>Үзсэн хугацаа</th>
+                        <th>Явц</th>
+                        <th>Огноо</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for h in history %}
+                    <tr>
+                        <td>{{ h.title }}</td>
+                        <td>{{ (h.watched_seconds // 60) }} минут</td>
+                        <td>
+                            <div class="progress" style="min-width:100px;background:#333;">
+                                <div class="progress-bar"
+                                     style="width:{{ h.progress }}%;background:#9b59e8;">
+                                    {{ h.progress }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ h.updated_at }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4">Үзсэн кино байхгүй.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
