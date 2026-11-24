@@ -1,433 +1,340 @@
+
 {% extends "base.html" %}
 
 {% block content %}
-
 <style>
-.admin-card {
-    background: #14161d;
-    border: 1px solid rgba(255,255,255,.08);
-    border-radius: 14px;
-    padding: 20px;
+.admin-wrap {
+    font-size: 13px;
+}
+.admin-wrap h2 {
+    font-size: 21px;
+    margin-bottom: 14px;
+}
+.admin-section {
     margin-bottom: 24px;
 }
-.form-control, .form-select {
-    background: #1c1f29;
-    border: 1px solid rgba(255,255,255,.12);
-    color: white;
-    border-radius: 8px;
-    padding: 10px 12px;
+.admin-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
-.form-control:focus, .form-select:focus {
-    background: #222632;
-    color: white;
-    border-color: #9d4edd;
-    box-shadow: none;
+.admin-table {
+    width: 100%;
+    font-size: 11px;
+    white-space: nowrap;
+    margin-bottom: 0;
 }
-.form-control::placeholder {
+.admin-table th,
+.admin-table td {
+    padding: 6px 7px !important;
+    vertical-align: middle;
+}
+.admin-table th {
+    font-size: 11px;
+}
+.admin-table .btn {
+    font-size: 10px;
+    padding: 3px 6px;
+}
+.status-online {
+    color: #198754;
+    font-weight: bold;
+}
+.guest-name {
     color: #888;
 }
-.form-label {
-    color: #adb5bd;
-    font-size: .88rem;
+.admin-card {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
 }
-.btn-submit-movie {
-    background: linear-gradient(90deg,#7209b7,#4361ee);
-    color: white !important;
-    font-weight: 700;
-    border: none;
-    border-radius: 10px;
-    padding: 11px 24px;
+.admin-form {
+    margin-bottom: 12px;
 }
-.admin-card .table {
-    vertical-align: middle;
+.admin-form input,
+.admin-form select,
+.admin-form textarea {
+    margin-bottom: 8px;
+}
+@media(max-width:600px) {
+    .admin-wrap {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    .admin-table {
+        font-size: 10px;
+    }
+    .admin-table th,
+    .admin-table td {
+        padding: 5px !important;
+    }
 }
 </style>
 
-<div class="container mt-3 pb-5">
+<div class="container admin-wrap">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold">⚙️ Админ удирдлага</h3>
-        <span class="badge bg-success fs-6">
-            🟢 Онлайн: {{ visitors|length }}
-        </span>
-    </div>
+    <h2>ADMIN PANEL</h2>
 
-    <!-- PAYMENT MANAGEMENT -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-info">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-    <div class="admin-card">
-        <h5 class="fw-bold mb-3 text-warning">
-            💳 Төлбөрийн хүсэлтүүд ({{ payments|length }})
-        </h5>
-
-        {% if payments %}
-        <div class="table-responsive">
-            <table class="table table-dark table-hover">
+    <!-- ОНЛАЙН ХЭРЭГЛЭГЧИД -->
+    <div class="admin-section">
+        <h5>🟢 Онлайн хэрэглэгчид</h5>
+        <div class="table-responsive admin-table-wrap">
+            <table class="table table-bordered table-striped admin-table">
                 <thead>
                     <tr>
-                        <th>Хэрэглэгч</th>
-                        <th>Багц</th>
-                        <th>Кино</th>
-                        <th>Төлөв</th>
-                        <th>Үйлдэл</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in payments %}
-                    <tr>
-                        <td class="text-info fw-bold">
-                            {{ p['username'] }}
-                        </td>
-
-                        <td>{{ p['method'] }}</td>
-
-                        <td>{{ p['title'] }}</td>
-
-                        <td>
-                            {% if p['status'] == 'approved' %}
-                                <span class="badge bg-success">Батлагдсан</span>
-                            {% elif p['status'] == 'rejected' %}
-                                <span class="badge bg-danger">Татгалзсан</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Хүлээгдэж буй</span>
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if p['status'] == 'pending' %}
-                            <div class="d-flex gap-1">
-
-                                <form method="POST"
-                                      action="{{ url_for('payment_action', pid=p['id'], action='approve') }}"
-                                      onsubmit="return confirm('Төлбөрийг батлах уу?')">
-                                    <button class="btn btn-success btn-sm">
-                                        ✅ Батлах
-                                    </button>
-                                </form>
-
-                                <form method="POST"
-                                      action="{{ url_for('payment_action', pid=p['id'], action='reject') }}"
-                                      onsubmit="return confirm('Төлбөрийг цуцлах уу?')">
-                                    <button class="btn btn-outline-danger btn-sm">
-                                        Цуцлах
-                                    </button>
-                                </form>
-
-                            </div>
-                            {% else %}
-                                <span class="text-secondary small">Шийдвэрлэгдсэн</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-            <p class="text-secondary">Төлбөрийн хүсэлт алга байна.</p>
-        {% endif %}
-    </div>
-
-
-    <!-- ONLINE VISITORS -->
-
-    <div class="admin-card">
-        <h5 class="fw-bold text-info mb-3">
-            👀 Онлайн үзэгчид (Сүүлийн 15 минут)
-        </h5>
-
-        {% if visitors %}
-        <div class="table-responsive">
-            <table class="table table-dark table-hover">
-                <thead>
-                    <tr>
-                        <th>Хэрэглэгч</th>
+                        <th>Нэр</th>
+                        <th>Төхөөрөмж</th>
+                        <th>Browser</th>
                         <th>IP</th>
                         <th>Хуудас</th>
                         <th>Үйлдэл</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for v in visitors %}
+                {% for v in visitors %}
                     <tr>
-                        <td>{{ v['username'] }}</td>
-                        <td><code>{{ v['ip'] }}</code></td>
-                        <td>{{ v['last_page'] }}</td>
                         <td>
-                            {% if v['ip'] in banned_ips %}
-                            <form method="POST" action="{{ url_for('unban_ip') }}">
-                                <input type="hidden" name="ip" value="{{ v['ip'] }}">
-                                <button class="btn btn-outline-success btn-sm">
-                                    Unban
-                                </button>
-                            </form>
+                            {% if v.username %}
+                                <strong>{{ v.username }}</strong>
                             {% else %}
-                            <form method="POST" action="{{ url_for('ban_ip') }}"
-                                  onsubmit="return confirm('IP хаах уу?')">
-                                <input type="hidden" name="ip" value="{{ v['ip'] }}">
-                                <button class="btn btn-danger btn-sm">
-                                    🚫 IP Ban
-                                </button>
-                            </form>
+                                <span class="guest-name">Зочин</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ v.device or 'Тодорхойгүй' }}</td>
+                        <td>{{ v.browser or 'Тодорхойгүй' }}</td>
+                        <td>{{ v.ip or '-' }}</td>
+                        <td>{{ v.page or '-' }}</td>
+                        <td>
+                            {% if v.ip %}
+                                <form method="POST" action="{{ url_for('ban_ip') }}" style="display:inline">
+                                    <input type="hidden" name="ip" value="{{ v.ip }}">
+                                    <button class="btn btn-danger" type="submit">
+                                        Хориглох
+                                    </button>
+                                </form>
                             {% endif %}
                         </td>
                     </tr>
-                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            Онлайн хэрэглэгч алга
+                        </td>
+                    </tr>
+                {% endfor %}
                 </tbody>
             </table>
         </div>
-        {% else %}
-            <p class="text-secondary">Онлайн үзэгч алга.</p>
-        {% endif %}
     </div>
 
+    <hr>
 
-    <!-- USERS -->
+    <!-- КИНО НЭМЭХ -->
+    <div class="admin-section">
+        <h5>🎬 Кино нэмэх</h5>
 
-    <div class="admin-card">
-        <h5 class="fw-bold text-success mb-3">
-            👥 Бүртгэлтэй хэрэглэгчид ({{ users|length }})
-        </h5>
+        <form method="POST"
+              action="{{ url_for('add_movie') }}"
+              enctype="multipart/form-data"
+              class="admin-form">
 
-        {% if users %}
-        <div class="table-responsive">
-            <table class="table table-dark table-hover">
-                <thead>
-                    <tr>
-                        <th>Нэр</th>
-                        <th>IP</th>
-                        <th>VIP хугацаа</th>
-                        <th>Төлөв</th>
-                        <th>Үйлдэл</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for u in users %}
-                    <tr>
-                        <td class="fw-bold">
-                            {{ u['username'] }}
-                            {% if u['is_admin'] %}
-                                <span class="badge bg-warning text-dark">Админ</span>
-                            {% endif %}
-                        </td>
+            <input type="text"
+                   name="title"
+                   class="form-control"
+                   placeholder="Киноны нэр"
+                   required>
 
-                        <td>
-                            <code>{{ u['last_ip'] or 'Тодорхойгүй' }}</code>
-                        </td>
+            <textarea name="description"
+                      class="form-control"
+                      placeholder="Киноны тайлбар"></textarea>
 
-                        <td>
-                            {% if u['vip_until'] %}
-                                {{ u['vip_until'][:10] }}
-                            {% else %}
-                                Энгийн
-                            {% endif %}
-                        </td>
+            <input type="text"
+                   name="category"
+                   class="form-control"
+                   placeholder="Ангилал">
 
-                        <td>
-                            {% if u['is_banned'] or (u['last_ip'] and u['last_ip'] in banned_ips) %}
-                                <span class="badge bg-danger">Хаагдсан</span>
-                            {% else %}
-                                <span class="badge bg-success">Идэвхтэй</span>
-                            {% endif %}
-                        </td>
+            <input type="text"
+                   name="poster"
+                   class="form-control"
+                   placeholder="Постер зурагны URL">
 
-                        <td>
-                            {% if not u['is_admin'] %}
+            <label>Видео файл оруулах</label>
+            <input type="file"
+                   name="video"
+                   class="form-control"
+                   accept="video/*">
 
-                                {% if u['is_banned'] or (u['last_ip'] and u['last_ip'] in banned_ips) %}
-                                <form method="POST" action="{{ url_for('unban_ip') }}">
-                                    <input type="hidden" name="ip" value="{{ u['last_ip'] or '' }}">
-                                    <input type="hidden" name="uid" value="{{ u['id'] }}">
-                                    <button class="btn btn-outline-success btn-sm">
-                                        Эрх нээх
-                                    </button>
-                                </form>
+            <label>Эсвэл видео URL оруулах</label>
+            <input type="text"
+                   name="source"
+                   class="form-control"
+                   placeholder="Видео URL">
 
-                                {% else %}
-                                <form method="POST" action="{{ url_for('ban_ip') }}"
-                                      onsubmit="return confirm('Хэрэглэгчийг хаах уу?')">
-                                    <input type="hidden" name="ip" value="{{ u['last_ip'] or '' }}">
-                                    <input type="hidden" name="uid" value="{{ u['id'] }}">
-                                    <button class="btn btn-danger btn-sm">
-                                        🚫 Ban
-                                    </button>
-                                </form>
-                                {% endif %}
+            <label>Видео эх сурвалж</label>
+            <select name="source_type" class="form-control">
+                <option value="file">Файл</option>
+                <option value="url">URL</option>
+            </select>
 
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-    </div>
-
-
-    <!-- ADD MOVIE -->
-
-    <div class="admin-card">
-        <h5 class="fw-bold mb-3" style="color:#9d4edd;">
-            ➕ Шинэ кино нэмэх
-        </h5>
-
-        <form action="{{ url_for('add_movie') }}"
-              method="POST"
-              enctype="multipart/form-data">
-
-            <div class="row g-3">
-
-                <div class="col-md-6">
-                    <label class="form-label">Киноны нэр</label>
-                    <input type="text"
-                           name="title"
-                           class="form-control"
-                           placeholder="Киноны нэр"
-                           required>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Ангилал</label>
-                    <select name="category" class="form-select">
-                        <option value="Action">Action</option>
-                        <option value="Comedy">Comedy</option>
-                        <option value="Drama">Drama</option>
-                        <option value="Thriller">Thriller</option>
-                        <option value="Horror">Horror</option>
-                        <option value="Anime">Anime</option>
-                        <option value="Series">Series</option>
-                        <option value="Бусад">Бусад</option>
-                    </select>
-                </div>
-
-                <div class="col-12">
-                    <label class="form-label">Тайлбар</label>
-                    <textarea name="description"
-                              class="form-control"
-                              rows="3"
-                              placeholder="Киноны тайлбар"></textarea>
-                </div>
-
-                <div class="col-12">
-                    <label class="form-label">Постер зурагны URL</label>
-                    <input type="text"
-                           name="poster"
-                           class="form-control"
-                           placeholder="https://example.com/poster.jpg">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Видео эх сурвалж</label>
-                    <select name="source_type"
-                            id="source_type"
-                            class="form-select"
-                            onchange="toggleSource()">
-                        <option value="url">Видео URL</option>
-                        <option value="file">Видео файл</option>
-                    </select>
-                </div>
-
-                <div class="col-md-6" id="url_box">
-                    <label class="form-label">Видео URL</label>
-                    <input type="url"
-                           name="source"
-                           class="form-control"
-                           placeholder="https://example.com/video.mp4">
-                </div>
-
-                <div class="col-md-6" id="file_box" style="display:none;">
-                    <label class="form-label">Видео файл</label>
-                    <input type="file"
-                           name="video"
-                           class="form-control"
-                           accept="video/*">
-                </div>
-
-                <div class="col-12">
-                    <div class="form-check">
-                        <input type="checkbox"
-                               name="paid"
-                               value="1"
-                               class="form-check-input"
-                               id="paid">
-                        <label for="paid" class="form-check-label">
-                            🔒 Төлбөртэй кино болгох
-                        </label>
-                    </div>
-                </div>
-
-                <div class="col-12">
-                    <button type="submit" class="btn-submit-movie">
-                        ➕ Кино нэмэх
-                    </button>
-                </div>
-
+            <div class="form-check mb-2">
+                <input type="checkbox"
+                       name="paid"
+                       value="1"
+                       class="form-check-input"
+                       id="paid">
+                <label class="form-check-label" for="paid">
+                    Төлбөртэй кино
+                </label>
             </div>
+
+            <button type="submit" class="btn btn-primary">
+                Кино нэмэх
+            </button>
         </form>
     </div>
 
+    <hr>
 
-    <!-- MOVIE LIST -->
+    <!-- КИНОНЫ ЖАГСААЛТ -->
+    <div class="admin-section">
+        <h5>📽️ Киноны жагсаалт</h5>
 
-    <div class="admin-card">
-        <h5 class="fw-bold mb-3 text-info">
-            🎬 Нэмэгдсэн кинонууд ({{ movies|length }})
-        </h5>
-
-        {% if movies %}
-        <div class="table-responsive">
-            <table class="table table-dark table-hover">
+        <div class="table-responsive admin-table-wrap">
+            <table class="table table-bordered admin-table">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Нэр</th>
                         <th>Ангилал</th>
-                        <th>Төлөв</th>
+                        <th>Төлбөр</th>
                         <th>Үйлдэл</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for m in movies %}
+                {% for movie in movies %}
                     <tr>
-                        <td>{{ m['title'] }}</td>
-                        <td>{{ m['category'] }}</td>
+                        <td>{{ movie.id }}</td>
+                        <td>{{ movie.title }}</td>
+                        <td>{{ movie.category or '-' }}</td>
                         <td>
-                            {% if m['paid'] %}
-                                <span class="badge bg-warning text-dark">Төлбөртэй</span>
+                            {% if movie.paid %}
+                                Төлбөртэй
                             {% else %}
-                                <span class="badge bg-success">Үнэгүй</span>
+                                Үнэгүй
                             {% endif %}
                         </td>
                         <td>
                             <form method="POST"
-                                  action="{{ url_for('delete_movie', mid=m['id']) }}"
+                                  action="{{ url_for('delete_movie', movie_id=movie.id) }}"
                                   onsubmit="return confirm('Энэ киног устгах уу?')">
-                                <button class="btn btn-danger btn-sm">
-                                    🗑 Устгах
+                                <button class="btn btn-danger" type="submit">
+                                    Устгах
                                 </button>
                             </form>
                         </td>
                     </tr>
-                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5">Кино алга</td>
+                    </tr>
+                {% endfor %}
                 </tbody>
             </table>
         </div>
-        {% else %}
-            <p class="text-secondary">Кино нэмэгдээгүй байна.</p>
-        {% endif %}
+    </div>
+
+    <hr>
+
+    <!-- ХЭРЭГЛЭГЧИД -->
+    <div class="admin-section">
+        <h5>👥 Бүртгэлтэй хэрэглэгчид</h5>
+
+        <div class="table-responsive admin-table-wrap">
+            <table class="table table-bordered admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Нэр</th>
+                        <th>Төлөв</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>
+                            {% if user.is_banned %}
+                                <span class="text-danger">Хориглосон</span>
+                            {% else %}
+                                <span class="text-success">Идэвхтэй</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3">Хэрэглэгч алга</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ТӨЛБӨРҮҮД -->
+    <div class="admin-section">
+        <h5>💳 Төлбөрийн хүсэлтүүд</h5>
+
+        <div class="table-responsive admin-table-wrap">
+            <table class="table table-bordered admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Хэрэглэгч</th>
+                        <th>Төрөл</th>
+                        <th>Дүн</th>
+                        <th>Төлөв</th>
+                        <th>Үйлдэл</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for payment in payments %}
+                    <tr>
+                        <td>{{ payment.id }}</td>
+                        <td>{{ payment.username or '-' }}</td>
+                        <td>{{ payment.method or '-' }}</td>
+                        <td>{{ payment.amount or '-' }}</td>
+                        <td>{{ payment.status or '-' }}</td>
+                        <td>
+                            {% if payment.status != 'approved' %}
+                                <form method="POST"
+                                      action="{{ url_for('approve_payment', payment_id=payment.id) }}">
+                                    <button class="btn btn-success" type="submit">
+                                        Зөвшөөрөх
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6">Төлбөрийн хүсэлт алга</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
-
-<script>
-function toggleSource() {
-    const type = document.getElementById("source_type").value;
-    document.getElementById("url_box").style.display =
-        type === "url" ? "block" : "none";
-    document.getElementById("file_box").style.display =
-        type === "file" ? "block" : "none";
-}
-
-toggleSource();
-</script>
-
 {% endblock %}
