@@ -18,6 +18,7 @@ from werkzeug.utils import secure_filename
 
 
 app = Flask(__name__)
+
 app.secret_key = os.environ.get(
     "SECRET_KEY",
     "change-this-secret-before-deployment"
@@ -33,28 +34,38 @@ os.makedirs(UPLOAD, exist_ok=True)
 os.makedirs(POSTERS, exist_ok=True)
 
 
+# =====================================
+# MEMBERSHIP PLANS
+# =====================================
+
 PLANS = {
     "single": {
-        "name": "1 кино (1 хоног — 4,000₮)",
+        "name": "1 кино (24 цаг — 4,000₮)",
         "price": 4000,
         "days": 1,
         "vip_days": 0
     },
+    "1m": {
+        "name": "1 сарын багц",
+        "price": 11999,
+        "days": 30,
+        "vip_days": 30
+    },
     "3m": {
-        "name": "3 сарын багц (12,000₮)",
-        "price": 12000,
+        "name": "3 сарын багц",
+        "price": 25999,
         "days": 90,
         "vip_days": 90
     },
     "6m": {
-        "name": "6 сарын багц (20,000₮)",
-        "price": 20000,
+        "name": "6 сарын багц",
+        "price": 35999,
         "days": 180,
         "vip_days": 180
     },
     "1y": {
-        "name": "1 жилийн багц (30,000₮)",
-        "price": 30000,
+        "name": "1 жилийн багц",
+        "price": 49999,
         "days": 365,
         "vip_days": 365
     }
@@ -68,26 +79,35 @@ PLANS = {
 class DBWrapper:
 
     def __init__(self):
+
         self.is_pg = bool(DATABASE_URL)
 
         if self.is_pg:
+
             self.conn = psycopg2.connect(
                 DATABASE_URL,
                 cursor_factory=RealDictCursor,
                 connect_timeout=15
             )
+
         else:
+
             self.conn = sqlite3.connect(
                 DB_PATH,
                 timeout=30
             )
+
             self.conn.row_factory = sqlite3.Row
 
     def execute(self, sql, params=()):
+
         if self.is_pg:
+
             sql = sql.replace("?", "%s")
+
             cur = self.conn.cursor()
             cur.execute(sql, params)
+
             return cur
 
         return self.conn.execute(sql, params)
@@ -108,20 +128,25 @@ def now():
 
 
 def date_text(value):
+
     if not value:
         return "-"
 
     try:
+
         return datetime.fromisoformat(
             str(value)
         ).strftime("%Y-%m-%d %H:%M")
+
     except (ValueError, TypeError):
+
         return str(value)
 
 
 def vip_info(vip_until):
 
     if not vip_until:
+
         return {
             "active": False,
             "days": 0,
@@ -129,10 +154,15 @@ def vip_info(vip_until):
         }
 
     try:
-        expiry = datetime.fromisoformat(str(vip_until))
+
+        expiry = datetime.fromisoformat(
+            str(vip_until)
+        )
+
         remaining = expiry - now()
 
         if remaining.total_seconds() <= 0:
+
             return {
                 "active": False,
                 "days": 0,
@@ -141,7 +171,10 @@ def vip_info(vip_until):
 
         days = max(
             1,
-            int((remaining.total_seconds() + 86399) // 86400)
+            int(
+                (remaining.total_seconds() + 86399)
+                // 86400
+            )
         )
 
         return {
@@ -151,6 +184,7 @@ def vip_info(vip_until):
         }
 
     except (ValueError, TypeError):
+
         return {
             "active": False,
             "days": 0,
@@ -159,9 +193,13 @@ def vip_info(vip_until):
 
 
 def get_ip():
-    forwarded = request.headers.get("X-Forwarded-For", "")
+
+    forwarded = request.headers.get(
+        "X-Forwarded-For", ""
+    )
 
     if forwarded:
+
         return forwarded.split(",")[0].strip()
 
     return request.remote_addr or "0.0.0.0"
@@ -175,31 +213,43 @@ def get_device():
 
     if "ipad" in ua or "tablet" in ua:
         device = "iPad"
+
     elif "iphone" in ua:
         device = "iPhone"
+
     elif "android" in ua:
         device = "Android"
+
     elif "windows" in ua:
         device = "Windows"
+
     elif "macintosh" in ua or "mac os" in ua:
         device = "Mac"
+
     elif "linux" in ua:
         device = "Linux"
+
     else:
         device = "Unknown"
 
     if "edg/" in ua:
         browser = "Edge"
+
     elif "opr/" in ua or "opera" in ua:
         browser = "Opera"
+
     elif "samsungbrowser" in ua:
         browser = "Samsung Internet"
+
     elif "chrome/" in ua:
         browser = "Chrome"
+
     elif "firefox/" in ua:
         browser = "Firefox"
+
     elif "safari/" in ua:
         browser = "Safari"
+
     else:
         browser = "Unknown"
 
@@ -213,6 +263,7 @@ def get_device():
 def ensure_column(c, table, column, definition):
 
     if c.is_pg:
+
         exists = c.execute(
             """
             SELECT column_name
@@ -223,11 +274,13 @@ def ensure_column(c, table, column, definition):
         ).fetchone()
 
         if not exists:
+
             c.execute(
                 f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
             )
 
     else:
+
         columns = [
             row["name"]
             for row in c.execute(
@@ -236,6 +289,7 @@ def ensure_column(c, table, column, definition):
         ]
 
         if column not in columns:
+
             c.execute(
                 f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
             )
@@ -273,7 +327,8 @@ def init():
             poster TEXT,
             source_type TEXT,
             source TEXT,
-            paid INTEGER DEFAULT 0
+            paid INTEGER DEFAULT 0,
+            view_count INTEGER DEFAULT 0
         )
     """)
 
@@ -327,8 +382,6 @@ def init():
         )
     """)
 
-    # Хуучин хүснэгтүүдэд дутуу багана байвал нэмнэ.
-
     user_columns = {
         "username": "TEXT",
         "password": "TEXT",
@@ -346,7 +399,8 @@ def init():
         "poster": "TEXT",
         "source_type": "TEXT",
         "source": "TEXT",
-        "paid": "INTEGER DEFAULT 0"
+        "paid": "INTEGER DEFAULT 0",
+        "view_count": "INTEGER DEFAULT 0"
     }
 
     payment_columns = {
@@ -364,13 +418,22 @@ def init():
     }
 
     for column, definition in user_columns.items():
-        ensure_column(c, "users", column, definition)
+
+        ensure_column(
+            c, "users", column, definition
+        )
 
     for column, definition in movie_columns.items():
-        ensure_column(c, "movies", column, definition)
+
+        ensure_column(
+            c, "movies", column, definition
+        )
 
     for column, definition in payment_columns.items():
-        ensure_column(c, "payments", column, definition)
+
+        ensure_column(
+            c, "payments", column, definition
+        )
 
     admin_name = os.environ.get(
         "ADMIN_USERNAME", "admin"
@@ -386,6 +449,7 @@ def init():
     ).fetchone()
 
     if not exists:
+
         c.execute(
             """
             INSERT INTO users(username, password, is_admin)
@@ -415,6 +479,7 @@ def track_and_check_ban():
         return
 
     ip = get_ip()
+
     c = db()
 
     if not session.get("admin"):
@@ -425,7 +490,9 @@ def track_and_check_ban():
         ).fetchone()
 
         if banned:
+
             c.close()
+
             return "Таны IP хаяг блоклогдсон байна.", 403
 
         if session.get("uid"):
@@ -436,17 +503,21 @@ def track_and_check_ban():
             ).fetchone()
 
             if user and user["is_banned"]:
+
                 session.clear()
                 c.close()
+
                 return "Таны бүртгэл хаагдсан байна.", 403
 
     visitor_id = session.get("visitor_id")
 
     if not visitor_id:
+
         visitor_id = uuid.uuid4().hex
         session["visitor_id"] = visitor_id
 
     device, browser = get_device()
+
     username = session.get("username") or "Зочин"
 
     c.execute("""
@@ -474,6 +545,7 @@ def track_and_check_ban():
     ))
 
     if session.get("uid"):
+
         c.execute(
             "UPDATE users SET last_ip=? WHERE id=?",
             (ip, session["uid"])
@@ -493,8 +565,12 @@ def login_required(f):
     def wrapper(*args, **kwargs):
 
         if not session.get("uid"):
+
             flash("Эхлээд нэвтэрнэ үү.")
-            return redirect(url_for("login"))
+
+            return redirect(
+                url_for("login")
+            )
 
         return f(*args, **kwargs)
 
@@ -507,8 +583,12 @@ def admin_required(f):
     def wrapper(*args, **kwargs):
 
         if not session.get("admin"):
+
             flash("Админ эрх шаардлагатай.")
-            return redirect(url_for("index"))
+
+            return redirect(
+                url_for("index")
+            )
 
         return f(*args, **kwargs)
 
@@ -525,7 +605,10 @@ def index():
     c = db()
 
     movies = c.execute(
-        "SELECT * FROM movies ORDER BY id DESC"
+        """
+        SELECT * FROM movies
+        ORDER BY id DESC
+        """
     ).fetchall()
 
     c.close()
@@ -533,6 +616,99 @@ def index():
     return render_template(
         "index.html",
         movies=movies,
+        plans=PLANS,
+        section_title="Шинэ кино"
+    )
+
+
+# =====================================
+# ALL MOVIES
+# =====================================
+
+@app.route("/movies")
+def all_movies():
+
+    c = db()
+
+    movies = c.execute(
+        """
+        SELECT * FROM movies
+        ORDER BY id DESC
+        """
+    ).fetchall()
+
+    c.close()
+
+    return render_template(
+        "index.html",
+        movies=movies,
+        plans=PLANS,
+        section_title="Бүх кино"
+    )
+
+
+# =====================================
+# FREE MOVIES
+# =====================================
+
+@app.route("/free")
+def free_movies():
+
+    c = db()
+
+    movies = c.execute(
+        """
+        SELECT * FROM movies
+        WHERE paid=0
+        ORDER BY id DESC
+        """
+    ).fetchall()
+
+    c.close()
+
+    return render_template(
+        "index.html",
+        movies=movies,
+        plans=PLANS,
+        section_title="Үнэгүй кино"
+    )
+
+
+# =====================================
+# POPULAR MOVIES
+# =====================================
+
+@app.route("/popular")
+def popular_movies():
+
+    c = db()
+
+    movies = c.execute(
+        """
+        SELECT * FROM movies
+        ORDER BY view_count DESC, id DESC
+        """
+    ).fetchall()
+
+    c.close()
+
+    return render_template(
+        "index.html",
+        movies=movies,
+        plans=PLANS,
+        section_title="Их үзэлттэй кино"
+    )
+
+
+# =====================================
+# MEMBERSHIP PAGE
+# =====================================
+
+@app.route("/membership")
+def membership():
+
+    return render_template(
+        "membership.html",
         plans=PLANS
     )
 
@@ -555,10 +731,14 @@ def register():
         )
 
         if len(username) < 3 or len(password) < 8:
+
             flash(
                 "Нэр 3-аас дээш, нууц үг 8-аас дээш тэмдэгт байна."
             )
-            return redirect(url_for("register"))
+
+            return redirect(
+                url_for("register")
+            )
 
         c = db()
 
@@ -568,9 +748,16 @@ def register():
         ).fetchone()
 
         if exists:
+
             c.close()
-            flash("Энэ хэрэглэгчийн нэр бүртгэлтэй байна.")
-            return redirect(url_for("register"))
+
+            flash(
+                "Энэ хэрэглэгчийн нэр бүртгэлтэй байна."
+            )
+
+            return redirect(
+                url_for("register")
+            )
 
         c.execute(
             """
@@ -587,8 +774,13 @@ def register():
         c.commit()
         c.close()
 
-        flash("Бүртгэл амжилттай. Нэвтэрнэ үү.")
-        return redirect(url_for("login"))
+        flash(
+            "Бүртгэл амжилттай. Нэвтэрнэ үү."
+        )
+
+        return redirect(
+            url_for("login")
+        )
 
     return render_template(
         "auth.html",
@@ -624,8 +816,14 @@ def login():
         ):
 
             if user["is_banned"]:
-                flash("Таны бүртгэл хаагдсан байна.")
-                return redirect(url_for("login"))
+
+                flash(
+                    "Таны бүртгэл хаагдсан байна."
+                )
+
+                return redirect(
+                    url_for("login")
+                )
 
             session.clear()
 
@@ -634,9 +832,13 @@ def login():
             session["admin"] = bool(user["is_admin"])
             session["visitor_id"] = uuid.uuid4().hex
 
-            return redirect(url_for("index"))
+            return redirect(
+                url_for("index")
+            )
 
-        flash("Нэвтрэх нэр эсвэл нууц үг буруу.")
+        flash(
+            "Нэвтрэх нэр эсвэл нууц үг буруу."
+        )
 
     return render_template(
         "auth.html",
@@ -653,7 +855,9 @@ def logout():
 
     session.clear()
 
-    return redirect(url_for("index"))
+    return redirect(
+        url_for("index")
+    )
 
 
 # =====================================
@@ -672,9 +876,13 @@ def profile():
     ).fetchone()
 
     if not user:
+
         c.close()
         session.clear()
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
 
     payments = c.execute("""
         SELECT p.*, m.title AS movie_title
@@ -694,7 +902,9 @@ def profile():
 
     c.close()
 
-    info = vip_info(user["vip_until"])
+    info = vip_info(
+        user["vip_until"]
+    )
 
     return render_template(
         "profile.html",
@@ -702,9 +912,54 @@ def profile():
         vip=info,
         payments=payments,
         history=history,
-        vip_started=date_text(user["vip_started_at"]),
+        vip_started=date_text(
+            user["vip_started_at"]
+        ),
         plans=PLANS
     )
+
+
+# =====================================
+# CHECK MOVIE ACCESS
+# =====================================
+
+def has_movie_access(c, movie, user_id):
+
+    if not movie["paid"]:
+        return True
+
+    user = c.execute(
+        """
+        SELECT vip_until
+        FROM users
+        WHERE id=?
+        """,
+        (user_id,)
+    ).fetchone()
+
+    if user and vip_info(
+        user["vip_until"]
+    )["active"]:
+
+        return True
+
+    single = c.execute("""
+        SELECT id
+        FROM payments
+        WHERE user_id=?
+        AND movie_id=?
+        AND request_type='movie'
+        AND status='approved'
+        AND expires_at > ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        user_id,
+        movie["id"],
+        now().isoformat()
+    )).fetchone()
+
+    return bool(single)
 
 
 # =====================================
@@ -722,44 +977,42 @@ def movie(mid):
     ).fetchone()
 
     if not m:
+
         c.close()
+
         return "Кино олдсонгүй", 404
 
     unlocked = False
 
     if not m["paid"] or session.get("admin"):
+
         unlocked = True
 
     elif session.get("uid"):
 
-        user = c.execute(
-            "SELECT vip_until FROM users WHERE id=?",
-            (session["uid"],)
-        ).fetchone()
+        unlocked = has_movie_access(
+            c,
+            m,
+            session["uid"]
+        )
 
-        if user and vip_info(
-            user["vip_until"]
-        )["active"]:
-            unlocked = True
+    # Үзэлтийн тоо нэмэгдүүлэх
+    c.execute(
+        """
+        UPDATE movies
+        SET view_count = COALESCE(view_count, 0) + 1
+        WHERE id=?
+        """,
+        (mid,)
+    )
 
-        if not unlocked:
+    # Шинэ үзэлтийн тоотой мэдээлэл авах
+    m = c.execute(
+        "SELECT * FROM movies WHERE id=?",
+        (mid,)
+    ).fetchone()
 
-            single = c.execute("""
-                SELECT id FROM payments
-                WHERE user_id=?
-                AND movie_id=?
-                AND request_type='movie'
-                AND status='approved'
-                AND expires_at > ?
-            """, (
-                session["uid"],
-                mid,
-                now().isoformat()
-            )).fetchone()
-
-            if single:
-                unlocked = True
-
+    c.commit()
     c.close()
 
     return render_template(
@@ -784,7 +1037,7 @@ def payment(mid):
 
         movie_data = {
             "id": 0,
-            "title": "VIP эрх"
+            "title": "Гишүүнчлэлийн багц"
         }
 
         request_type = "vip"
@@ -797,7 +1050,9 @@ def payment(mid):
         ).fetchone()
 
         if not movie_data:
+
             c.close()
+
             return "Кино олдсонгүй", 404
 
         request_type = "movie"
@@ -805,7 +1060,8 @@ def payment(mid):
     if request.method == "POST":
 
         default_plan = (
-            "3m" if request_type == "vip"
+            "1m"
+            if request_type == "vip"
             else "single"
         )
 
@@ -815,13 +1071,22 @@ def payment(mid):
         ).strip()
 
         if selected_plan not in PLANS:
+
             selected_plan = default_plan
 
         if mid == 0 and selected_plan == "single":
-            c.close()
-            flash("VIP багц сонгоно уу.")
-            return redirect(url_for("payment", mid=0))
 
+            c.close()
+
+            flash(
+                "Гишүүнчлэлийн багц сонгоно уу."
+            )
+
+            return redirect(
+                url_for("payment", mid=0)
+            )
+
+        # Нэг кино эсвэл VIP багц
         request_type = (
             "movie"
             if selected_plan == "single"
@@ -873,9 +1138,16 @@ def payment(mid):
         )).fetchone()
 
         if pending:
+
             c.close()
-            flash("Энэ хүсэлт админы шийдвэрийг хүлээж байна.")
-            return redirect(url_for("profile"))
+
+            flash(
+                "Энэ хүсэлт админы шийдвэрийг хүлээж байна."
+            )
+
+            return redirect(
+                url_for("profile")
+            )
 
         c.execute("""
             INSERT INTO payments(
@@ -905,9 +1177,13 @@ def payment(mid):
         c.commit()
         c.close()
 
-        flash("Төлбөрийн хүсэлт амжилттай илгээгдлээ.")
+        flash(
+            "Төлбөрийн хүсэлт амжилттай илгээгдлээ."
+        )
 
-        return redirect(url_for("profile"))
+        return redirect(
+            url_for("profile")
+        )
 
     c.close()
 
@@ -917,7 +1193,7 @@ def payment(mid):
         request_type=request_type,
         plans=PLANS,
         default_method=(
-            "VIP багц"
+            "Гишүүнчлэлийн багц"
             if request_type == "vip"
             else PLANS["single"]["name"]
         )
@@ -932,24 +1208,37 @@ def payment(mid):
 @login_required
 def watch_progress():
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     try:
-        movie_id = int(data.get("movie_id", 0))
+
+        movie_id = int(
+            data.get("movie_id", 0)
+        )
+
         watched = max(
             0,
             float(data.get("watched", 0))
         )
+
         duration = max(
             0,
             float(data.get("duration", 0))
         )
 
     except (ValueError, TypeError):
-        return jsonify({"ok": False}), 400
+
+        return jsonify({
+            "ok": False
+        }), 400
 
     if movie_id <= 0 or duration <= 0:
-        return jsonify({"ok": False}), 400
+
+        return jsonify({
+            "ok": False
+        }), 400
 
     progress = min(
         100,
@@ -958,14 +1247,35 @@ def watch_progress():
 
     c = db()
 
-    movie_exists = c.execute(
-        "SELECT id FROM movies WHERE id=?",
+    movie_data = c.execute(
+        "SELECT * FROM movies WHERE id=?",
         (movie_id,)
     ).fetchone()
 
-    if not movie_exists:
+    if not movie_data:
+
         c.close()
-        return jsonify({"ok": False}), 404
+
+        return jsonify({
+            "ok": False
+        }), 404
+
+    if (
+        movie_data["paid"]
+        and not session.get("admin")
+        and not has_movie_access(
+            c,
+            movie_data,
+            session["uid"]
+        )
+    ):
+
+        c.close()
+
+        return jsonify({
+            "ok": False,
+            "message": "Үзэх эрх дууссан байна."
+        }), 403
 
     if c.is_pg:
 
@@ -1051,7 +1361,10 @@ def admin():
     c = db()
 
     movies = c.execute(
-        "SELECT * FROM movies ORDER BY id DESC"
+        """
+        SELECT * FROM movies
+        ORDER BY id DESC
+        """
     ).fetchall()
 
     payments = c.execute("""
@@ -1074,12 +1387,15 @@ def admin():
 
         item = dict(user)
 
-        info = vip_info(user["vip_until"])
+        info = vip_info(
+            user["vip_until"]
+        )
 
         item["vip"] = info
         item["vip_days"] = info["days"]
         item["vip_active"] = info["active"]
         item["vip_until"] = info["until"]
+
         item["vip_started"] = date_text(
             user["vip_started_at"]
         )
@@ -1157,24 +1473,42 @@ def add_movie():
     )
 
     if not title:
-        flash("Киноны нэр шаардлагатай.")
-        return redirect(url_for("admin"))
+
+        flash(
+            "Киноны нэр шаардлагатай."
+        )
+
+        return redirect(
+            url_for("admin")
+        )
 
     video_file = request.files.get("video")
 
     if source_type == "upload":
 
         if not video_file or not video_file.filename:
-            flash("Видео файл сонгоно уу.")
-            return redirect(url_for("admin"))
+
+            flash(
+                "Видео файл сонгоно уу."
+            )
+
+            return redirect(
+                url_for("admin")
+            )
 
         filename = secure_filename(
             video_file.filename
         )
 
         if not filename:
-            flash("Видео файлын нэр буруу байна.")
-            return redirect(url_for("admin"))
+
+            flash(
+                "Видео файлын нэр буруу байна."
+            )
+
+            return redirect(
+                url_for("admin")
+            )
 
         name = (
             f"{uuid.uuid4().hex}_{filename}"
@@ -1190,14 +1524,22 @@ def add_movie():
         )
 
     if not source:
-        flash("Киноны видео эх сурвалж шаардлагатай.")
-        return redirect(url_for("admin"))
+
+        flash(
+            "Киноны видео эх сурвалж шаардлагатай."
+        )
+
+        return redirect(
+            url_for("admin")
+        )
 
     poster = request.form.get(
         "poster", ""
     ).strip()
 
-    poster_file = request.files.get("poster_file")
+    poster_file = request.files.get(
+        "poster_file"
+    )
 
     if poster_file and poster_file.filename:
 
@@ -1230,9 +1572,10 @@ def add_movie():
             poster,
             source_type,
             source,
-            paid
+            paid,
+            view_count
         )
-        VALUES(?,?,?,?,?,?,?)
+        VALUES(?,?,?,?,?,?,?,0)
     """, (
         title,
         description,
@@ -1246,9 +1589,13 @@ def add_movie():
     c.commit()
     c.close()
 
-    flash("Кино амжилттай нэмэгдлээ.")
+    flash(
+        "Кино амжилттай нэмэгдлээ."
+    )
 
-    return redirect(url_for("admin"))
+    return redirect(
+        url_for("admin")
+    )
 
 
 # =====================================
@@ -1296,6 +1643,7 @@ def ban_ip():
         ))
 
         if uid:
+
             c.execute(
                 "UPDATE users SET is_banned=1 WHERE id=?",
                 (uid,)
@@ -1304,9 +1652,13 @@ def ban_ip():
         c.commit()
         c.close()
 
-        flash(f"{ip} хаяг блоклогдлоо.")
+        flash(
+            f"{ip} хаяг блоклогдлоо."
+        )
 
-    return redirect(url_for("admin"))
+    return redirect(
+        url_for("admin")
+    )
 
 
 # =====================================
@@ -1327,12 +1679,14 @@ def unban_ip():
     c = db()
 
     if ip:
+
         c.execute(
             "DELETE FROM banned_ips WHERE ip=?",
             (ip,)
         )
 
     if uid:
+
         c.execute(
             "UPDATE users SET is_banned=0 WHERE id=?",
             (uid,)
@@ -1341,9 +1695,13 @@ def unban_ip():
     c.commit()
     c.close()
 
-    flash("Блок цуцлагдлаа.")
+    flash(
+        "Блок цуцлагдлаа."
+    )
 
-    return redirect(url_for("admin"))
+    return redirect(
+        url_for("admin")
+    )
 
 
 # =====================================
@@ -1359,6 +1717,7 @@ def unban_ip():
 def payment_action(pid, action):
 
     if action not in ("approve", "reject"):
+
         return "Bad request", 400
 
     c = db()
@@ -1369,13 +1728,22 @@ def payment_action(pid, action):
     ).fetchone()
 
     if not p:
+
         c.close()
+
         return "Хүсэлт олдсонгүй", 404
 
     if p["status"] != "pending":
+
         c.close()
-        flash("Энэ хүсэлт өмнө нь шийдвэрлэгдсэн байна.")
-        return redirect(url_for("admin"))
+
+        flash(
+            "Энэ хүсэлт өмнө нь шийдвэрлэгдсэн байна."
+        )
+
+        return redirect(
+            url_for("admin")
+        )
 
     status = (
         "approved"
@@ -1411,6 +1779,7 @@ def payment_action(pid, action):
         )
     )
 
+    # VIP эрх олгох
     if (
         action == "approve"
         and PLANS[plan_key]["vip_days"] > 0
@@ -1438,6 +1807,7 @@ def payment_action(pid, action):
         if user and user["vip_until"]:
 
             try:
+
                 cur = datetime.fromisoformat(
                     str(user["vip_until"])
                 )
@@ -1468,9 +1838,13 @@ def payment_action(pid, action):
     c.commit()
     c.close()
 
-    flash("Төлбөрийн хүсэлт шинэчлэгдлээ.")
+    flash(
+        "Төлбөрийн хүсэлт шинэчлэгдлээ."
+    )
 
-    return redirect(url_for("admin"))
+    return redirect(
+        url_for("admin")
+    )
 
 
 # =====================================
@@ -1495,9 +1869,13 @@ def delete_movie(mid):
     c.commit()
     c.close()
 
-    flash("Кино устгагдлаа.")
+    flash(
+        "Кино устгагдлаа."
+    )
 
-    return redirect(url_for("admin"))
+    return redirect(
+        url_for("admin")
+    )
 
 
 # =====================================
