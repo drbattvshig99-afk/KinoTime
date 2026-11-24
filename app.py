@@ -1,53 +1,37 @@
-
 import os
 import sqlite3
 import uuid
-
 from datetime import datetime, timedelta
 from functools import wraps
 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
 from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    session,
-    flash,
-    send_from_directory,
+    Flask, render_template, request, redirect,
+    url_for, session, flash, send_from_directory,
     jsonify
 )
 
-from werkzeug.security import (
-    generate_password_hash,
-    check_password_hash
-)
-
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 
-# =====================================
-# APP CONFIG
-# =====================================
-
 app = Flask(__name__)
-
 app.secret_key = os.environ.get(
     "SECRET_KEY",
     "change-this-secret-before-deployment"
 )
 
-DB = os.environ.get("DATABASE", "kinotime.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+DB_PATH = os.environ.get("DATABASE", "kinotime.db")
 
 UPLOAD = os.path.join("static", "uploads")
+POSTERS = os.path.join("static", "posters")
 
 os.makedirs(UPLOAD, exist_ok=True)
-os.makedirs("static/posters", exist_ok=True)
+os.makedirs(POSTERS, exist_ok=True)
 
-
-# =====================================
-# PAYMENT PLANS
-# =====================================
 
 PLANS = {
     "single": {
@@ -56,21 +40,18 @@ PLANS = {
         "days": 1,
         "vip_days": 0
     },
-
     "3m": {
         "name": "3 сарын багц (12,000₮)",
         "price": 12000,
         "days": 90,
         "vip_days": 90
     },
-
     "6m": {
         "name": "6 сарын багц (20,000₮)",
         "price": 20000,
         "days": 180,
         "vip_days": 180
     },
-
     "1y": {
         "name": "1 жилийн багц (30,000₮)",
         "price": 30000,
@@ -84,10 +65,42 @@ PLANS = {
 # DATABASE
 # =====================================
 
+class DBWrapper:
+
+    def __init__(self):
+        self.is_pg = bool(DATABASE_URL)
+
+        if self.is_pg:
+            self.conn = psycopg2.connect(
+                DATABASE_URL,
+                cursor_factory=RealDictCursor,
+                connect_timeout=15
+            )
+        else:
+            self.conn = sqlite3.connect(
+                DB_PATH,
+                timeout=30
+            )
+            self.conn.row_factory = sqlite3.Row
+
+    def execute(self, sql, params=()):
+        if self.is_pg:
+            sql = sql.replace("?", "%s")
+            cur = self.conn.cursor()
+            cur.execute(sql, params)
+            return cur
+
+        return self.conn.execute(sql, params)
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.conn.close()
+
+
 def db():
-    c = sqlite3.connect(DB, timeout=30)
-    c.row_factory = sqlite3.Row
-    return c
+    return DBWrapper()
 
 
 def now():
@@ -95,15 +108,13 @@ def now():
 
 
 def date_text(value):
-
     if not value:
         return "-"
 
     try:
         return datetime.fromisoformat(
-            value
+            str(value)
         ).strftime("%Y-%m-%d %H:%M")
-
     except (ValueError, TypeError):
         return str(value)
 
@@ -118,7 +129,7 @@ def vip_info(vip_until):
         }
 
     try:
-        expiry = datetime.fromisoformat(vip_until)
+        expiry = datetime.fromisoformat(str(vip_until))
         remaining = expiry - now()
 
         if remaining.total_seconds() <= 0:
@@ -130,9 +141,7 @@ def vip_info(vip_until):
 
         days = max(
             1,
-            int(
-                (remaining.total_seconds() + 86399) // 86400
-            )
+            int((remaining.total_seconds() + 86399) // 86400)
         )
 
         return {
@@ -150,6 +159,11 @@ def vip_info(vip_until):
 
 
 def get_ip():
+    forwarded = request.headers.get("X-Forwarded-For", "")
+
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+
     return request.remote_addr or "0.0.0.0"
 
 
@@ -161,87 +175,98 @@ def get_device():
 
     if "ipad" in ua or "tablet" in ua:
         device = "iPad"
-
     elif "iphone" in ua:
         device = "iPhone"
-
     elif "android" in ua:
         device = "Android"
-
     elif "windows" in ua:
         device = "Windows"
-
     elif "macintosh" in ua or "mac os" in ua:
         device = "Mac"
-
     elif "linux" in ua:
         device = "Linux"
-
     else:
         device = "Unknown"
 
     if "edg/" in ua:
         browser = "Edge"
-
     elif "opr/" in ua or "opera" in ua:
         browser = "Opera"
-
     elif "samsungbrowser" in ua:
         browser = "Samsung Internet"
-
     elif "chrome/" in ua:
         browser = "Chrome"
-
     elif "firefox/" in ua:
         browser = "Firefox"
-
     elif "safari/" in ua:
         browser = "Safari"
-
     else:
         browser = "Unknown"
 
     return device, browser
 
 
-def add_column(c, table, column, definition):
-
-    columns = [
-        row["name"]
-        for row in c.execute(
-            f"PRAGMA table_info({table})"
-        ).fetchall()
-    ]
-
-    if column not in columns:
-        c.execute(
-            f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
-        )
-
-
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
+
+def ensure_column(c, table, column, definition):
+
+    if c.is_pg:
+        exists = c.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name=? AND column_name=?
+            """,
+            (table, column)
+        ).fetchone()
+
+        if not exists:
+            c.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
+            )
+
+    else:
+        columns = [
+            row["name"]
+            for row in c.execute(
+                f"PRAGMA table_info({table})"
+            ).fetchall()
+        ]
+
+        if column not in columns:
+            c.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
+            )
+
 
 def init():
 
     c = db()
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY,
+    pk = (
+        "SERIAL PRIMARY KEY"
+        if c.is_pg
+        else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    )
+
+    c.execute(f"""
+        CREATE TABLE IF NOT EXISTS users (
+            id {pk},
             username TEXT UNIQUE,
             password TEXT,
             is_admin INTEGER DEFAULT 0,
+            vip_started_at TEXT,
             vip_until TEXT,
             last_ip TEXT,
             is_banned INTEGER DEFAULT 0
         )
     """)
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS movies(
-            id INTEGER PRIMARY KEY,
+    c.execute(f"""
+        CREATE TABLE IF NOT EXISTS movies (
+            id {pk},
             title TEXT,
             description TEXT,
             category TEXT,
@@ -252,74 +277,34 @@ def init():
         )
     """)
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS payments(
-            id INTEGER PRIMARY KEY,
+    c.execute(f"""
+        CREATE TABLE IF NOT EXISTS payments (
+            id {pk},
             user_id INTEGER,
             movie_id INTEGER,
             method TEXT,
             proof TEXT,
-            status TEXT DEFAULT 'pending'
+            status TEXT DEFAULT 'pending',
+            request_type TEXT,
+            amount INTEGER DEFAULT 0,
+            created_at TEXT,
+            decided_at TEXT,
+            plan TEXT,
+            expires_at TEXT
         )
     """)
 
     c.execute("""
-        CREATE TABLE IF NOT EXISTS banned_ips(
+        CREATE TABLE IF NOT EXISTS banned_ips (
             ip TEXT PRIMARY KEY,
             reason TEXT,
             created_at TEXT
         )
     """)
 
-    # USER MIGRATIONS
-
-    add_column(c, "users", "vip_started_at", "TEXT")
-    add_column(c, "users", "vip_until", "TEXT")
-    add_column(c, "users", "last_ip", "TEXT")
-    add_column(c, "users", "is_banned", "INTEGER DEFAULT 0")
-
-    # PAYMENT MIGRATIONS
-
-    add_column(c, "payments", "request_type", "TEXT")
-    add_column(c, "payments", "amount", "INTEGER DEFAULT 0")
-    add_column(c, "payments", "created_at", "TEXT")
-    add_column(c, "payments", "decided_at", "TEXT")
-    add_column(c, "payments", "plan", "TEXT")
-    add_column(c, "payments", "expires_at", "TEXT")
-
-    # OLD PAYMENT DATA
-
-    c.execute("""
-        UPDATE payments
-        SET request_type =
-            CASE
-                WHEN movie_id = 0 THEN 'vip'
-                ELSE 'movie'
-            END
-        WHERE request_type IS NULL OR request_type = ''
-    """)
-
-    c.execute("""
-        UPDATE payments
-        SET created_at = ?
-        WHERE created_at IS NULL
-    """, (now().isoformat(),))
-
-    c.execute("""
-        UPDATE payments
-        SET plan =
-            CASE
-                WHEN request_type = 'vip' THEN '3m'
-                ELSE 'single'
-            END
-        WHERE plan IS NULL OR plan = ''
-    """)
-
-    # WATCH HISTORY
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS watch_history(
-            id INTEGER PRIMARY KEY,
+    c.execute(f"""
+        CREATE TABLE IF NOT EXISTS watch_history (
+            id {pk},
             user_id INTEGER NOT NULL,
             movie_id INTEGER NOT NULL,
             watched_seconds REAL DEFAULT 0,
@@ -330,97 +315,62 @@ def init():
         )
     """)
 
-    # VISITORS
-
-    columns = [
-        row["name"]
-        for row in c.execute(
-            "PRAGMA table_info(visitors)"
-        ).fetchall()
-    ]
-
-    if not columns:
-
-        c.execute("""
-            CREATE TABLE visitors(
-                visitor_id TEXT PRIMARY KEY,
-                ip TEXT,
-                username TEXT,
-                device TEXT,
-                browser TEXT,
-                last_page TEXT,
-                last_seen TEXT
-            )
-        """)
-
-    elif "visitor_id" not in columns:
-
-        c.execute(
-            "ALTER TABLE visitors RENAME TO visitors_old"
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS visitors (
+            visitor_id TEXT PRIMARY KEY,
+            ip TEXT,
+            username TEXT,
+            device TEXT,
+            browser TEXT,
+            last_page TEXT,
+            last_seen TEXT
         )
+    """)
 
-        c.execute("""
-            CREATE TABLE visitors(
-                visitor_id TEXT PRIMARY KEY,
-                ip TEXT,
-                username TEXT,
-                device TEXT,
-                browser TEXT,
-                last_page TEXT,
-                last_seen TEXT
-            )
-        """)
+    # Хуучин хүснэгтүүдэд дутуу багана байвал нэмнэ.
 
-        old_rows = c.execute(
-            "SELECT * FROM visitors_old"
-        ).fetchall()
+    user_columns = {
+        "username": "TEXT",
+        "password": "TEXT",
+        "is_admin": "INTEGER DEFAULT 0",
+        "vip_started_at": "TEXT",
+        "vip_until": "TEXT",
+        "last_ip": "TEXT",
+        "is_banned": "INTEGER DEFAULT 0"
+    }
 
-        for row in old_rows:
+    movie_columns = {
+        "title": "TEXT",
+        "description": "TEXT",
+        "category": "TEXT",
+        "poster": "TEXT",
+        "source_type": "TEXT",
+        "source": "TEXT",
+        "paid": "INTEGER DEFAULT 0"
+    }
 
-            old_keys = row.keys()
+    payment_columns = {
+        "user_id": "INTEGER",
+        "movie_id": "INTEGER",
+        "method": "TEXT",
+        "proof": "TEXT",
+        "status": "TEXT DEFAULT 'pending'",
+        "request_type": "TEXT",
+        "amount": "INTEGER DEFAULT 0",
+        "created_at": "TEXT",
+        "decided_at": "TEXT",
+        "plan": "TEXT",
+        "expires_at": "TEXT"
+    }
 
-            c.execute("""
-                INSERT INTO visitors(
-                    visitor_id,
-                    ip,
-                    username,
-                    device,
-                    browser,
-                    last_page,
-                    last_seen
-                )
-                VALUES(?,?,?,?,?,?,?)
-            """, (
-                uuid.uuid4().hex,
-                row["ip"] if "ip" in old_keys else "",
-                row["username"] if "username" in old_keys else "",
-                "Unknown",
-                "Unknown",
-                row["last_page"] if "last_page" in old_keys else "",
-                row["last_seen"] if "last_seen" in old_keys else ""
-            ))
+    for column, definition in user_columns.items():
+        ensure_column(c, "users", column, definition)
 
-        c.execute("DROP TABLE visitors_old")
+    for column, definition in movie_columns.items():
+        ensure_column(c, "movies", column, definition)
 
-    else:
-
-        for col in [
-            "ip TEXT",
-            "username TEXT",
-            "device TEXT",
-            "browser TEXT",
-            "last_page TEXT",
-            "last_seen TEXT"
-        ]:
-
-            name = col.split()[0]
-
-            if name not in columns:
-                c.execute(
-                    f"ALTER TABLE visitors ADD COLUMN {col}"
-                )
-
-    # DEFAULT ADMIN
+    for column, definition in payment_columns.items():
+        ensure_column(c, "payments", column, definition)
 
     admin_name = os.environ.get(
         "ADMIN_USERNAME", "admin"
@@ -436,18 +386,16 @@ def init():
     ).fetchone()
 
     if not exists:
-
-        c.execute("""
-            INSERT INTO users(
-                username,
-                password,
-                is_admin
-            )
+        c.execute(
+            """
+            INSERT INTO users(username, password, is_admin)
             VALUES(?,?,1)
-        """, (
-            admin_name,
-            generate_password_hash(admin_password)
-        ))
+            """,
+            (
+                admin_name,
+                generate_password_hash(admin_password)
+            )
+        )
 
     c.commit()
     c.close()
@@ -499,18 +447,12 @@ def track_and_check_ban():
         session["visitor_id"] = visitor_id
 
     device, browser = get_device()
-
     username = session.get("username") or "Зочин"
 
     c.execute("""
         INSERT INTO visitors(
-            visitor_id,
-            ip,
-            username,
-            device,
-            browser,
-            last_page,
-            last_seen
+            visitor_id, ip, username,
+            device, browser, last_page, last_seen
         )
         VALUES(?,?,?,?,?,?,?)
 
@@ -532,7 +474,6 @@ def track_and_check_ban():
     ))
 
     if session.get("uid"):
-
         c.execute(
             "UPDATE users SET last_ip=? WHERE id=?",
             (ip, session["uid"])
@@ -543,7 +484,7 @@ def track_and_check_ban():
 
 
 # =====================================
-# LOGIN / ADMIN DECORATORS
+# DECORATORS
 # =====================================
 
 def login_required(f):
@@ -609,45 +550,45 @@ def register():
             "username", ""
         ).strip()
 
-        password = request.form.get("password", "")
+        password = request.form.get(
+            "password", ""
+        )
 
         if len(username) < 3 or len(password) < 8:
-
             flash(
                 "Нэр 3-аас дээш, нууц үг 8-аас дээш тэмдэгт байна."
             )
-
             return redirect(url_for("register"))
 
         c = db()
 
-        try:
+        exists = c.execute(
+            "SELECT id FROM users WHERE username=?",
+            (username,)
+        ).fetchone()
 
-            c.execute("""
-                INSERT INTO users(
-                    username,
-                    password,
-                    last_ip
-                )
-                VALUES(?,?,?)
-            """, (
+        if exists:
+            c.close()
+            flash("Энэ хэрэглэгчийн нэр бүртгэлтэй байна.")
+            return redirect(url_for("register"))
+
+        c.execute(
+            """
+            INSERT INTO users(username, password, last_ip)
+            VALUES(?,?,?)
+            """,
+            (
                 username,
                 generate_password_hash(password),
                 get_ip()
-            ))
+            )
+        )
 
-            c.commit()
+        c.commit()
+        c.close()
 
-            flash("Бүртгэл амжилттай. Нэвтэрнэ үү.")
-
-            return redirect(url_for("login"))
-
-        except sqlite3.IntegrityError:
-
-            flash("Энэ хэрэглэгчийн нэр бүртгэлтэй байна.")
-
-        finally:
-            c.close()
+        flash("Бүртгэл амжилттай. Нэвтэрнэ үү.")
+        return redirect(url_for("login"))
 
     return render_template(
         "auth.html",
@@ -668,7 +609,11 @@ def login():
 
         user = c.execute(
             "SELECT * FROM users WHERE username=?",
-            (request.form.get("username", "").strip(),)
+            (
+                request.form.get(
+                    "username", ""
+                ).strip(),
+            )
         ).fetchone()
 
         c.close()
@@ -712,7 +657,7 @@ def logout():
 
 
 # =====================================
-# USER PROFILE
+# PROFILE
 # =====================================
 
 @app.route("/profile")
@@ -732,8 +677,7 @@ def profile():
         return redirect(url_for("login"))
 
     payments = c.execute("""
-        SELECT p.*,
-               m.title AS movie_title
+        SELECT p.*, m.title AS movie_title
         FROM payments p
         LEFT JOIN movies m ON m.id=p.movie_id
         WHERE p.user_id=?
@@ -741,9 +685,7 @@ def profile():
     """, (session["uid"],)).fetchall()
 
     history = c.execute("""
-        SELECT h.*,
-               m.title,
-               m.poster
+        SELECT h.*, m.title, m.poster
         FROM watch_history h
         JOIN movies m ON m.id=h.movie_id
         WHERE h.user_id=?
@@ -766,7 +708,7 @@ def profile():
 
 
 # =====================================
-# MOVIE PAGE
+# MOVIE
 # =====================================
 
 @app.route("/movie/<int:mid>")
@@ -786,7 +728,6 @@ def movie(mid):
     unlocked = False
 
     if not m["paid"] or session.get("admin"):
-
         unlocked = True
 
     elif session.get("uid"):
@@ -796,19 +737,20 @@ def movie(mid):
             (session["uid"],)
         ).fetchone()
 
-        if user and vip_info(user["vip_until"])["active"]:
+        if user and vip_info(
+            user["vip_until"]
+        )["active"]:
             unlocked = True
 
         if not unlocked:
 
             single = c.execute("""
-                SELECT id
-                FROM payments
+                SELECT id FROM payments
                 WHERE user_id=?
-                  AND movie_id=?
-                  AND request_type='movie'
-                  AND status='approved'
-                  AND expires_at > ?
+                AND movie_id=?
+                AND request_type='movie'
+                AND status='approved'
+                AND expires_at > ?
             """, (
                 session["uid"],
                 mid,
@@ -829,7 +771,7 @@ def movie(mid):
 
 
 # =====================================
-# PAYMENT REQUEST
+# PAYMENT
 # =====================================
 
 @app.route("/payment/<int:mid>", methods=["GET", "POST"])
@@ -862,49 +804,68 @@ def payment(mid):
 
     if request.method == "POST":
 
+        default_plan = (
+            "3m" if request_type == "vip"
+            else "single"
+        )
+
         selected_plan = request.form.get(
             "plan",
-            "3m" if request_type == "vip" else "single"
+            default_plan
         ).strip()
 
-        if request_type == "movie":
-            selected_plan = "single"
-
         if selected_plan not in PLANS:
+            selected_plan = default_plan
 
+        if mid == 0 and selected_plan == "single":
             c.close()
+            flash("VIP багц сонгоно уу.")
+            return redirect(url_for("payment", mid=0))
 
-            flash("Багц буруу байна.")
-
-            return redirect(
-                url_for("payment", mid=mid)
-            )
-
-        if request_type == "vip" and selected_plan == "single":
-
-            c.close()
-
-            flash("VIP багцаа зөв сонгоно уу.")
-
-            return redirect(
-                url_for("payment", mid=mid)
-            )
+        request_type = (
+            "movie"
+            if selected_plan == "single"
+            else "vip"
+        )
 
         plan = PLANS[selected_plan]
 
-        method = plan["name"]
-
-        proof = request.form.get(
-            "proof", ""
+        method = request.form.get(
+            "method",
+            plan["name"]
         ).strip()
 
+        proofname = ""
+
+        proof_file = request.files.get("proof")
+
+        if proof_file and proof_file.filename:
+
+            fn = secure_filename(
+                proof_file.filename
+            )
+
+            proofname = (
+                f"{session['uid']}_{mid}_"
+                f"{uuid.uuid4().hex[:6]}_{fn}"
+            )
+
+            proof_file.save(
+                os.path.join(UPLOAD, proofname)
+            )
+
+        else:
+
+            proofname = request.form.get(
+                "proof", ""
+            ).strip()
+
         pending = c.execute("""
-            SELECT id
-            FROM payments
+            SELECT id FROM payments
             WHERE user_id=?
-              AND movie_id=?
-              AND request_type=?
-              AND status='pending'
+            AND movie_id=?
+            AND request_type=?
+            AND status='pending'
         """, (
             session["uid"],
             mid,
@@ -912,11 +873,8 @@ def payment(mid):
         )).fetchone()
 
         if pending:
-
             c.close()
-
             flash("Энэ хүсэлт админы шийдвэрийг хүлээж байна.")
-
             return redirect(url_for("profile"))
 
         c.execute("""
@@ -936,7 +894,7 @@ def payment(mid):
             session["uid"],
             mid,
             method,
-            proof,
+            proofname,
             "pending",
             request_type,
             plan["price"],
@@ -967,7 +925,7 @@ def payment(mid):
 
 
 # =====================================
-# WATCH HISTORY PROGRESS
+# WATCH PROGRESS
 # =====================================
 
 @app.route("/watch-progress", methods=["POST"])
@@ -977,21 +935,17 @@ def watch_progress():
     data = request.get_json(silent=True) or {}
 
     try:
-
         movie_id = int(data.get("movie_id", 0))
-
         watched = max(
             0,
             float(data.get("watched", 0))
         )
-
         duration = max(
             0,
             float(data.get("duration", 0))
         )
 
     except (ValueError, TypeError):
-
         return jsonify({"ok": False}), 400
 
     if movie_id <= 0 or duration <= 0:
@@ -1013,33 +967,61 @@ def watch_progress():
         c.close()
         return jsonify({"ok": False}), 404
 
-    c.execute("""
-        INSERT INTO watch_history(
-            user_id,
-            movie_id,
-            watched_seconds,
-            duration_seconds,
-            progress,
-            updated_at
-        )
-        VALUES(?,?,?,?,?,?)
+    if c.is_pg:
 
-        ON CONFLICT(user_id,movie_id) DO UPDATE SET
+        sql = """
+            INSERT INTO watch_history(
+                user_id,
+                movie_id,
+                watched_seconds,
+                duration_seconds,
+                progress,
+                updated_at
+            )
+            VALUES(?,?,?,?,?,?)
 
-            watched_seconds=MAX(
-                watch_history.watched_seconds,
-                excluded.watched_seconds
-            ),
+            ON CONFLICT(user_id, movie_id)
+            DO UPDATE SET
+                watched_seconds=GREATEST(
+                    watch_history.watched_seconds,
+                    EXCLUDED.watched_seconds
+                ),
+                duration_seconds=EXCLUDED.duration_seconds,
+                progress=GREATEST(
+                    watch_history.progress,
+                    EXCLUDED.progress
+                ),
+                updated_at=EXCLUDED.updated_at
+        """
 
-            duration_seconds=excluded.duration_seconds,
+    else:
 
-            progress=MAX(
-                watch_history.progress,
-                excluded.progress
-            ),
+        sql = """
+            INSERT INTO watch_history(
+                user_id,
+                movie_id,
+                watched_seconds,
+                duration_seconds,
+                progress,
+                updated_at
+            )
+            VALUES(?,?,?,?,?,?)
 
-            updated_at=excluded.updated_at
-    """, (
+            ON CONFLICT(user_id, movie_id)
+            DO UPDATE SET
+                watched_seconds=MAX(
+                    watch_history.watched_seconds,
+                    excluded.watched_seconds
+                ),
+                duration_seconds=excluded.duration_seconds,
+                progress=MAX(
+                    watch_history.progress,
+                    excluded.progress
+                ),
+                updated_at=excluded.updated_at
+        """
+
+    c.execute(sql, (
         session["uid"],
         movie_id,
         watched,
@@ -1108,12 +1090,14 @@ def admin():
         now() - timedelta(minutes=15)
     ).isoformat()
 
-    visitors = c.execute("""
-        SELECT *
-        FROM visitors
+    visitors = c.execute(
+        """
+        SELECT * FROM visitors
         WHERE last_seen > ?
         ORDER BY last_seen DESC
-    """, (cutoff,)).fetchall()
+        """,
+        (cutoff,)
+    ).fetchall()
 
     banned_ips = [
         row["ip"]
@@ -1132,6 +1116,151 @@ def admin():
         visitors=visitors,
         banned_ips=banned_ips,
         plans=PLANS
+    )
+
+
+# =====================================
+# ADD MOVIE
+# =====================================
+
+@app.route("/admin/add", methods=["POST"])
+@login_required
+@admin_required
+def add_movie():
+
+    title = request.form.get(
+        "title", ""
+    ).strip()
+
+    description = request.form.get(
+        "description", ""
+    ).strip()
+
+    category = request.form.get(
+        "category", "Бусад"
+    ).strip()
+
+    source_type = request.form.get(
+        "source_type", "url"
+    ).strip()
+
+    source = request.form.get(
+        "source", ""
+    ).strip()
+
+    paid = (
+        1
+        if request.form.get("paid") in (
+            "1", "on", "true", "yes"
+        )
+        else 0
+    )
+
+    if not title:
+        flash("Киноны нэр шаардлагатай.")
+        return redirect(url_for("admin"))
+
+    video_file = request.files.get("video")
+
+    if source_type == "upload":
+
+        if not video_file or not video_file.filename:
+            flash("Видео файл сонгоно уу.")
+            return redirect(url_for("admin"))
+
+        filename = secure_filename(
+            video_file.filename
+        )
+
+        if not filename:
+            flash("Видео файлын нэр буруу байна.")
+            return redirect(url_for("admin"))
+
+        name = (
+            f"{uuid.uuid4().hex}_{filename}"
+        )
+
+        video_file.save(
+            os.path.join(UPLOAD, name)
+        )
+
+        source = url_for(
+            "uploaded",
+            name=name
+        )
+
+    if not source:
+        flash("Киноны видео эх сурвалж шаардлагатай.")
+        return redirect(url_for("admin"))
+
+    poster = request.form.get(
+        "poster", ""
+    ).strip()
+
+    poster_file = request.files.get("poster_file")
+
+    if poster_file and poster_file.filename:
+
+        poster_filename = secure_filename(
+            poster_file.filename
+        )
+
+        if poster_filename:
+
+            poster_name = (
+                f"{uuid.uuid4().hex}_{poster_filename}"
+            )
+
+            poster_file.save(
+                os.path.join(POSTERS, poster_name)
+            )
+
+            poster = url_for(
+                "static",
+                filename=f"posters/{poster_name}"
+            )
+
+    c = db()
+
+    c.execute("""
+        INSERT INTO movies(
+            title,
+            description,
+            category,
+            poster,
+            source_type,
+            source,
+            paid
+        )
+        VALUES(?,?,?,?,?,?,?)
+    """, (
+        title,
+        description,
+        category,
+        poster,
+        source_type,
+        source,
+        paid
+    ))
+
+    c.commit()
+    c.close()
+
+    flash("Кино амжилттай нэмэгдлээ.")
+
+    return redirect(url_for("admin"))
+
+
+# =====================================
+# UPLOADED VIDEO
+# =====================================
+
+@app.route("/uploads/<path:name>")
+def uploaded(name):
+
+    return send_from_directory(
+        UPLOAD,
+        name
     )
 
 
@@ -1155,12 +1284,11 @@ def ban_ip():
         c = db()
 
         c.execute("""
-            INSERT OR IGNORE INTO banned_ips(
-                ip,
-                reason,
-                created_at
+            INSERT INTO banned_ips(
+                ip, reason, created_at
             )
             VALUES(?,?,?)
+            ON CONFLICT(ip) DO NOTHING
         """, (
             ip,
             "Admin banned",
@@ -1168,7 +1296,6 @@ def ban_ip():
         ))
 
         if uid:
-
             c.execute(
                 "UPDATE users SET is_banned=1 WHERE id=?",
                 (uid,)
@@ -1200,14 +1327,12 @@ def unban_ip():
     c = db()
 
     if ip:
-
         c.execute(
             "DELETE FROM banned_ips WHERE ip=?",
             (ip,)
         )
 
     if uid:
-
         c.execute(
             "UPDATE users SET is_banned=0 WHERE id=?",
             (uid,)
@@ -1222,144 +1347,12 @@ def unban_ip():
 
 
 # =====================================
-# ADD MOVIE
-# =====================================
-
-@app.route("/admin/add", methods=["POST"])
-@login_required
-@admin_required
-def add_movie():
-
-    title = request.form.get(
-        "title", ""
-    ).strip()
-
-    source_type = request.form.get(
-        "source_type", "url"
-    )
-
-    source = request.form.get(
-        "source", ""
-    ).strip()
-
-    upload = request.files.get("video")
-
-    if not title:
-
-        flash("Киноны нэр оруулна уу.")
-
-        return redirect(url_for("admin"))
-
-    if source_type == "file":
-
-        if not upload or not upload.filename:
-
-            flash("Видео файл сонгоно уу.")
-
-            return redirect(url_for("admin"))
-
-        filename = secure_filename(
-            upload.filename
-        )
-
-        if not filename:
-
-            flash("Файлын нэр буруу байна.")
-
-            return redirect(url_for("admin"))
-
-        ext = os.path.splitext(filename)[1].lower()
-
-        allowed_extensions = {
-            ".mp4",
-            ".webm",
-            ".ogg",
-            ".mov",
-            ".m4v"
-        }
-
-        if ext not in allowed_extensions:
-
-            flash("Зөвхөн MP4, WEBM, OGG, MOV, M4V файл оруулна уу.")
-
-            return redirect(url_for("admin"))
-
-        filename = uuid.uuid4().hex + ext
-
-        upload.save(
-            os.path.join(UPLOAD, filename)
-        )
-
-        source = url_for(
-            "uploaded",
-            name=filename
-        )
-
-    elif source_type == "url":
-
-        if not source:
-
-            flash("Видео URL оруулна уу.")
-
-            return redirect(url_for("admin"))
-
-    else:
-
-        flash("Видео эх сурвалжийн төрөл буруу байна.")
-
-        return redirect(url_for("admin"))
-
-    c = db()
-
-    c.execute("""
-        INSERT INTO movies(
-            title,
-            description,
-            category,
-            poster,
-            source_type,
-            source,
-            paid
-        )
-        VALUES(?,?,?,?,?,?,?)
-    """, (
-        title,
-        request.form.get("description", ""),
-        request.form.get("category", "Бусад"),
-        request.form.get("poster", ""),
-        source_type,
-        source,
-        1 if request.form.get("paid") else 0
-    ))
-
-    c.commit()
-    c.close()
-
-    flash("Кино амжилттай нэмэгдлээ.")
-
-    return redirect(url_for("admin"))
-
-
-# =====================================
-# UPLOADED VIDEO
-# =====================================
-
-@app.route("/uploads/<path:name>")
-def uploaded(name):
-
-    return send_from_directory(
-        UPLOAD,
-        name
-    )
-
-
-# =====================================
-# APPROVE / REJECT PAYMENT
+# PAYMENT APPROVE / REJECT
 # =====================================
 
 @app.route(
     "/admin/payment/<int:pid>/<action>",
-    methods=["POST"]
+    methods=["GET", "POST"]
 )
 @login_required
 @admin_required
@@ -1370,23 +1363,18 @@ def payment_action(pid, action):
 
     c = db()
 
-    payment = c.execute(
+    p = c.execute(
         "SELECT * FROM payments WHERE id=?",
         (pid,)
     ).fetchone()
 
-    if not payment:
-
+    if not p:
         c.close()
-
         return "Хүсэлт олдсонгүй", 404
 
-    if payment["status"] != "pending":
-
+    if p["status"] != "pending":
         c.close()
-
         flash("Энэ хүсэлт өмнө нь шийдвэрлэгдсэн байна.")
-
         return redirect(url_for("admin"))
 
     status = (
@@ -1395,134 +1383,92 @@ def payment_action(pid, action):
         else "rejected"
     )
 
-    request_type = payment["request_type"]
-
-    if not request_type:
-
-        request_type = (
-            "vip"
-            if payment["movie_id"] == 0
-            else "movie"
-        )
-
-    selected_plan = payment["plan"]
-
-    if selected_plan not in PLANS:
-
-        selected_plan = (
-            "3m"
-            if request_type == "vip"
-            else "single"
-        )
-
-    plan = PLANS[selected_plan]
-
     current_time = now()
 
-    c.execute("""
+    plan_key = (
+        p["plan"]
+        if p["plan"] in PLANS
+        else "single"
+    )
+
+    plan_days = PLANS[plan_key]["days"]
+
+    expires_at = (
+        current_time + timedelta(days=plan_days)
+    ).isoformat() if action == "approve" else None
+
+    c.execute(
+        """
         UPDATE payments
-        SET status=?,
-            decided_at=?,
-            plan=?
+        SET status=?, decided_at=?, expires_at=?
         WHERE id=?
-    """, (
-        status,
-        current_time.isoformat(),
-        selected_plan,
-        pid
-    ))
+        """,
+        (
+            status,
+            current_time.isoformat(),
+            expires_at,
+            pid
+        )
+    )
 
-    if action == "approve":
+    if (
+        action == "approve"
+        and PLANS[plan_key]["vip_days"] > 0
+    ):
 
-        if request_type == "vip":
+        vip_days = PLANS[plan_key]["vip_days"]
 
-            user = c.execute("""
-                SELECT vip_until, vip_started_at
-                FROM users
-                WHERE id=?
-            """, (
-                payment["user_id"],
-            )).fetchone()
+        user = c.execute(
+            """
+            SELECT vip_until, vip_started_at
+            FROM users
+            WHERE id=?
+            """,
+            (p["user_id"],)
+        ).fetchone()
 
-            base_time = current_time
+        base = current_time
 
-            if user and user["vip_until"]:
+        started = (
+            user["vip_started_at"]
+            if user and user["vip_started_at"]
+            else current_time.isoformat()
+        )
 
-                try:
+        if user and user["vip_until"]:
 
-                    old_expiry = datetime.fromisoformat(
-                        user["vip_until"]
-                    )
+            try:
+                cur = datetime.fromisoformat(
+                    str(user["vip_until"])
+                )
 
-                    if old_expiry > current_time:
-                        base_time = old_expiry
+                if cur > base:
+                    base = cur
 
-                except (ValueError, TypeError):
-                    pass
+            except (ValueError, TypeError):
+                pass
 
-            vip_days = plan["vip_days"]
+        new_until = (
+            base + timedelta(days=vip_days)
+        ).isoformat()
 
-            if vip_days <= 0:
-                vip_days = plan["days"]
-
-            new_expiry = (
-                base_time + timedelta(days=vip_days)
+        c.execute(
+            """
+            UPDATE users
+            SET vip_until=?, vip_started_at=?
+            WHERE id=?
+            """,
+            (
+                new_until,
+                started,
+                p["user_id"]
             )
-
-            started_at = (
-                user["vip_started_at"]
-                if user and user["vip_started_at"]
-                else current_time.isoformat()
-            )
-
-            c.execute("""
-                UPDATE users
-                SET vip_started_at=?,
-                    vip_until=?
-                WHERE id=?
-            """, (
-                started_at,
-                new_expiry.isoformat(),
-                payment["user_id"]
-            ))
-
-            c.execute("""
-                UPDATE payments
-                SET expires_at=?
-                WHERE id=?
-            """, (
-                new_expiry.isoformat(),
-                pid
-            ))
-
-        elif request_type == "movie":
-
-            expires_at = (
-                current_time
-                + timedelta(days=plan["days"])
-            ).isoformat()
-
-            c.execute("""
-                UPDATE payments
-                SET expires_at=?
-                WHERE id=?
-            """, (
-                expires_at,
-                pid
-            ))
+        )
 
     c.commit()
     c.close()
 
-    if action == "approve":
-
-        flash(
-            "Төлбөр батлагдлаа. Эрх амжилттай идэвхжлээ."
-        )
-
-    else:
-
-        flash("Төлбөрийн хүсэлтээс татгалзлаа.")
+    flash("Төлбөрийн хүсэлт шинэчлэгдлээ.")
 
     return redirect(url_for("admin"))
 
@@ -1533,7 +1479,7 @@ def payment_action(pid, action):
 
 @app.route(
     "/admin/delete/<int:mid>",
-    methods=["POST"]
+    methods=["GET", "POST"]
 )
 @login_required
 @admin_required
@@ -1543,11 +1489,6 @@ def delete_movie(mid):
 
     c.execute(
         "DELETE FROM movies WHERE id=?",
-        (mid,)
-    )
-
-    c.execute(
-        "DELETE FROM watch_history WHERE movie_id=?",
         (mid,)
     )
 
