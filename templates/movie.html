@@ -1,77 +1,152 @@
 {% extends "base.html" %}
-
 {% block content %}
+
 <style>
-    .player-wrapper {
-        background: #000;
-        border-radius: 16px;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        aspect-ratio: 16 / 9;
-        width: 100%;
-    }
-    .locked-box {
-        background: linear-gradient(135deg, #161624, #1f1635);
-        border: 1px solid rgba(157, 78, 221, 0.3);
-        border-radius: 16px;
-        padding: 40px 20px;
-        text-align: center;
-    }
-    .detail-card {
-        background: #12121e;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 16px;
-        padding: 20px;
-    }
+.player-wrapper {
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.1);
+    aspect-ratio: 16 / 9;
+    width: 100%;
+}
+.locked-box {
+    background: linear-gradient(135deg,#161624,#291640);
+    border: 1px solid rgba(157,78,221,.3);
+    border-radius: 16px;
+    padding: 40px 20px;
+    text-align: center;
+}
+.detail-card {
+    background: #12121e;
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 16px;
+    padding: 20px;
+}
+.btn-purple {
+    background: #914bdc;
+    color: white;
+    border: none;
+}
+.btn-purple:hover { background: #7434b8; color: white; }
 </style>
 
 <div class="container mt-3 pb-5">
-    <a href="{{ url_for('index') }}" class="btn btn-dark-glass btn-sm mb-3">← Буцах</a>
+
+    <a href="{{ url_for('index') }}" class="btn btn-dark btn-sm mb-3">
+        ← Буцах
+    </a>
 
     {% if unlocked %}
+
         <div class="player-wrapper mb-4">
+
             {% if movie['source_type'] == 'file' %}
-                <video controls autoplay class="w-100 h-100">
+                <video id="moviePlayer"
+                       controls
+                       autoplay
+                       class="w-100 h-100">
                     <source src="{{ movie['source'] }}" type="video/mp4">
                 </video>
             {% else %}
-                <iframe src="{{ movie['source'] }}" class="w-100 h-100 border-0" allowfullscreen></iframe>
+                <iframe src="{{ movie['source'] }}"
+                        class="w-100 h-100 border-0"
+                        allowfullscreen>
+                </iframe>
             {% endif %}
+
         </div>
+
     {% else %}
+
         <div class="locked-box mb-4">
-            <div style="font-size: 2.5rem;" class="mb-2">👑</div>
-            <h4 class="fw-bold">Энэ нь VIP төлбөртэй кино байна</h4>
-            <p class="text-secondary small mx-auto" style="max-width: 450px;">
-                Энэхүү киног үзэхийн тулд нэвтэрч ороод төлбөрөө баталгаажуулна уу.
+            <div style="font-size:2.5rem;">👑</div>
+            <h4 class="text-white fw-bold">Энэ кино төлбөртэй</h4>
+            <p class="text-light">
+                Киног үзэхийн тулд VIP эрх эсвэл тухайн киноны эрх авна уу.
             </p>
+
             {% if session.get('uid') %}
-                <a href="{{ url_for('payment', mid=movie['id']) }}" class="btn btn-purple px-4 mt-2">💳 Эрх нээлгэх / Төлбөр төлөх</a>
+                <a href="{{ url_for('payment', mid=movie['id']) }}"
+                   class="btn btn-purple px-4 mt-2">
+                    💳 Кино үзэх хүсэлт илгээх
+                </a>
+
+                <a href="{{ url_for('payment', mid=0) }}"
+                   class="btn btn-outline-light px-4 mt-2">
+                    👑 1 сарын VIP авах
+                </a>
             {% else %}
-                <div class="d-flex justify-content-center gap-2 mt-2">
-                    <a href="{{ url_for('login') }}" class="btn btn-purple px-4">Нэвтрэх</a>
-                    <a href="{{ url_for('register') }}" class="btn btn-dark-glass px-4">Бүртгүүлэх</a>
-                </div>
+                <a href="{{ url_for('login') }}" class="btn btn-purple">
+                    Нэвтрэх
+                </a>
+                <a href="{{ url_for('register') }}" class="btn btn-outline-light">
+                    Бүртгүүлэх
+                </a>
             {% endif %}
         </div>
+
     {% endif %}
 
     <div class="detail-card">
-        <div class="d-flex gap-3">
-            <img src="{{ movie['poster'] or 'https://placeholder.com' }}" class="rounded-3 d-none d-sm-block" style="width: 110px; height: 160px; object-fit: cover;">
-            <div>
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge" style="background: #7209b7;">{{ movie['category'] }}</span>
-                    {% if movie['paid'] %}
-                        <span class="badge bg-warning text-dark">VIP</span>
-                    {% else %}
-                        <span class="badge bg-success">Үнэгүй</span>
-                    {% endif %}
-                </div>
-                <h4 class="fw-bold mb-2">{{ movie['title'] }}</h4>
-                <p class="text-secondary small mb-0">{{ movie['description'] or 'Тайлбар оруулаагүй байна.' }}</p>
+        <div class="row g-3">
+
+            {% if movie['poster'] %}
+            <div class="col-md-3">
+                <img src="{{ movie['poster'] }}"
+                     class="img-fluid rounded"
+                     alt="{{ movie['title'] }}">
             </div>
+            {% endif %}
+
+            <div class="col">
+                <span class="badge bg-secondary">
+                    {{ movie['category'] }}
+                </span>
+
+                {% if movie['paid'] %}
+                    <span class="badge bg-warning text-dark">VIP</span>
+                {% else %}
+                    <span class="badge bg-success">Үнэгүй</span>
+                {% endif %}
+
+                <h3 class="text-white mt-2">{{ movie['title'] }}</h3>
+
+                <p class="text-secondary">
+                    {{ movie['description'] }}
+                </p>
+            </div>
+
         </div>
     </div>
+
 </div>
+
+<script>
+const player = document.getElementById("moviePlayer");
+
+if (player) {
+    let lastSent = 0;
+
+    player.addEventListener("timeupdate", function () {
+        const now = Date.now();
+
+        if (now - lastSent < 10000) return;
+        lastSent = now;
+
+        fetch("{{ url_for('watch_progress') }}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                movie_id: {{ movie['id'] }},
+                watched_seconds: Math.floor(player.currentTime),
+                duration: Math.floor(player.duration || 0)
+            })
+        });
+    });
+}
+</script>
+
 {% endblock %}
