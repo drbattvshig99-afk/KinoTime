@@ -26,30 +26,42 @@
             font-weight: 800;
             font-size: 1.35rem;
             color: #fff;
+            white-space: nowrap;
         }
         .brand-icon {
             background: linear-gradient(135deg, #7b2cbf, #4361ee);
             color: white;
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border-radius: 8px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
         .brand-wrap span {
             color: #9d4edd;
         }
+        .nav-scroll {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .nav-scroll::-webkit-scrollbar {
+            display: none;
+        }
         .nav-pill-item {
             color: #a0a0b8;
             text-decoration: none;
-            font-size: 0.88rem;
+            font-size: 0.84rem;
             font-weight: 500;
-            padding: 6px 14px;
+            padding: 6px 13px;
             border-radius: 20px;
             transition: 0.2s;
             white-space: nowrap;
+            display: inline-block;
         }
         .nav-pill-item:hover, .nav-pill-item.active {
             background: linear-gradient(90deg, #6930c3, #5390d9);
@@ -59,10 +71,15 @@
             background: #1a1a2e;
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 20px;
-            padding: 5px 14px;
+            padding: 6px 14px;
             color: #fff;
             font-size: 0.85rem;
-            width: 180px;
+            width: 100%;
+        }
+        @media (min-width: 768px) {
+            .search-box {
+                width: 210px;
+            }
         }
         .search-box:focus {
             outline: none;
@@ -74,8 +91,9 @@
             color: #fff;
             font-weight: 600;
             border-radius: 8px;
-            padding: 7px 16px;
-            font-size: 0.88rem;
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            white-space: nowrap;
         }
         .btn-purple:hover {
             opacity: 0.9;
@@ -83,13 +101,13 @@
         }
         .btn-dark-glass {
             background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.15);
             color: #fff;
             font-weight: 500;
             border-radius: 8px;
-            padding: 7px 16px;
-            font-size: 0.88rem;
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            white-space: nowrap;
         }
         .btn-dark-glass:hover {
             background: rgba(255, 255, 255, 0.2);
@@ -99,13 +117,15 @@
 </head>
 <body>
     <nav class="navbar-custom sticky-top">
-        <div class="container d-flex align-items-center justify-content-between gap-2">
-            <a href="{{ url_for('index') }}" class="brand-wrap">
+        <div class="container d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <!-- 1. Лого -->
+            <a href="{{ url_for('index') }}" class="brand-wrap order-1">
                 <div class="brand-icon">▶</div>
                 <div>Kino<span>time</span></div>
             </a>
 
-            <div class="d-none d-lg-flex align-items-center gap-1">
+            <!-- 2. Цэс (Утсан дээр бүтэн өргөнөөр доор нь, компьютер дээр дунд нь) -->
+            <div class="nav-scroll order-3 order-lg-2 w-100 w-lg-auto py-1 py-lg-0">
                 <a href="{{ url_for('index') }}" class="nav-pill-item active">🏠 Нүүр</a>
                 <a href="#movies-section" class="nav-pill-item">🎬 Кино</a>
                 <a href="#movies-section" class="nav-pill-item">📺 Сериал</a>
@@ -113,8 +133,9 @@
                 <a href="#movies-section" class="nav-pill-item text-warning">👑 VIP</a>
             </div>
 
-            <div class="d-flex align-items-center gap-2">
-                <input type="text" id="liveSearch" class="search-box d-none d-sm-block" placeholder="🔍 Кино хайх...">
+            <!-- 3. Хайлт ба Нэвтрэх/Админ товч -->
+            <div class="d-flex align-items-center gap-2 order-2 order-lg-3 ms-auto ms-lg-0">
+                <input type="text" id="liveSearch" class="search-box d-none d-md-block" placeholder="🔍 Кино хайх...">
                 {% if session.get('uid') %}
                     {% if session.get('admin') %}
                         <a href="{{ url_for('admin') }}" class="btn btn-warning btn-sm fw-bold rounded-pill px-3">Админ</a>
@@ -124,6 +145,11 @@
                     <a href="{{ url_for('login') }}" class="btn btn-dark-glass btn-sm rounded-pill">Нэвтрэх</a>
                     <a href="{{ url_for('register') }}" class="btn btn-purple btn-sm rounded-pill">Бүртгүүлэх</a>
                 {% endif %}
+            </div>
+
+            <!-- Утсан дээрх хайлтын хэсэг -->
+            <div class="w-100 d-md-none order-4">
+                <input type="text" id="liveSearchMobile" class="search-box" placeholder="🔍 Кино хайх...">
             </div>
         </div>
     </nav>
@@ -144,5 +170,17 @@
     {% block content %}{% endblock %}
 
     <script src="https://jsdelivr.net"></script>
+    <script>
+        const mobileSearch = document.getElementById('liveSearchMobile');
+        if (mobileSearch) {
+            mobileSearch.addEventListener('input', (e) => {
+                const q = e.target.value.toLowerCase();
+                document.querySelectorAll('.movie-item').forEach(item => {
+                    const title = item.getAttribute('data-title');
+                    item.style.display = title.includes(q) ? 'block' : 'none';
+                });
+            });
+        }
+    </script>
 </body>
 </html>
