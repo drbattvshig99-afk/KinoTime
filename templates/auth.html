@@ -1,1 +1,36 @@
-{% extends "base.html" %}{% block content %}<div class="panel narrow"><h1>{% if mode=='login' %}Нэвтрэх{% else %}Бүртгүүлэх{% endif %}</h1><form method="post"><label>Хэрэглэгчийн нэр</label><input name="username" required minlength="3"><label>Нууц үг (8-аас дээш тэмдэгт)</label><input type="password" name="password" required minlength="8"><button>{% if mode=='login' %}Нэвтрэх{% else %}Бүртгүүлэх{% endif %}</button></form></div>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 75vh;">
+    <div class="p-4 rounded-4 w-100" style="max-width: 400px; background: #12121e; border: 1px solid rgba(255,255,255,0.08);">
+        <h4 class="fw-bold text-center mb-1">
+            {{ 'Бүртгүүлэх' if mode == 'register' else 'Тавтай морил' }}
+        </h4>
+        <p class="text-secondary text-center small mb-4">
+            {{ 'Шинэ хэрэглэгчийн бүртгэл үүсгэх' if mode == 'register' else 'Өөрийн бүртгэлээр нэвтэрнэ үү' }}
+        </p>
+
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label small text-secondary">Хэрэглэгчийн нэр</label>
+                <input type="text" name="username" class="form-control bg-dark text-white border-secondary" required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label small text-secondary">Нууц үг</label>
+                <input type="password" name="password" class="form-control bg-dark text-white border-secondary" required>
+            </div>
+            <button type="submit" class="btn btn-purple w-100 py-2">
+                {{ 'Бүртгүүлэх' if mode == 'register' else 'Нэвтрэх' }}
+            </button>
+        </form>
+
+        <div class="text-center mt-3 small">
+            {% if mode == 'register' %}
+                <span class="text-secondary">Бүртгэлтэй юу?</span> <a href="{{ url_for('login') }}" style="color: #9d4edd;">Нэвтрэх</a>
+            {% else %}
+                <span class="text-secondary">Шинэ хэрэглэгч үү?</span> <a href="{{ url_for('register') }}" style="color: #9d4edd;">Бүртгүүлэх</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
