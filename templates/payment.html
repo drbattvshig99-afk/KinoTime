@@ -1,1 +1,89 @@
-{% extends "base.html" %}{% block content %}<div class="panel narrow"><h1>Төлбөр: {{movie.title}}</h1><p>Төлбөрийн мэдээллийг админ тохируулж оруулна. Шилжүүлгийн баримтаа хавсаргана уу.</p><div class="notice">ХААН Банкны данс болон QPay QR мэдээллийг сайтын эзэмшигч баталгаажуулж байршуулна.</div><form method="post" enctype="multipart/form-data"><label>Төлбөрийн арга</label><select name="method"><option>QPay</option><option>ХААН Банкны шилжүүлэг</option></select><label>Гүйлгээний баримт (зураг)</label><input type="file" name="proof" accept="image/*"><button>Хүсэлт илгээх</button></form></div>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .pay-card {
+        background: #12121e;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 24px;
+    }
+    .plan-box {
+        background: #1a1a2e;
+        border: 1px solid rgba(157, 78, 221, 0.25);
+        border-radius: 12px;
+        padding: 12px;
+        text-align: center;
+    }
+    .bank-box {
+        background: rgba(114, 9, 183, 0.12);
+        border: 1px dashed #9d4edd;
+        border-radius: 12px;
+        padding: 15px;
+    }
+</style>
+
+<div class="container mt-3 pb-5" style="max-width: 550px;">
+    <a href="{{ url_for('movie', mid=movie['id']) }}" class="btn btn-dark-glass btn-sm mb-3">← Буцах</a>
+
+    <div class="pay-card">
+        <h4 class="fw-bold mb-1">💳 VIP эрх идэвхжүүлэх</h4>
+        <p class="text-secondary small mb-3">Кино: <b class="text-white">{{ movie['title'] }}</b></p>
+
+        <!-- Үнийн тариф -->
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <div class="plan-box">
+                    <div class="small text-secondary">1 Сар</div>
+                    <div class="fw-bold text-warning">4,000₮</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="plan-box">
+                    <div class="small text-secondary">3 Сар</div>
+                    <div class="fw-bold text-warning">12,000₮</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="plan-box">
+                    <div class="small text-secondary">6 Сар</div>
+                    <div class="fw-bold text-warning">20,000₮</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="plan-box">
+                    <div class="small text-secondary">1 Жил</div>
+                    <div class="fw-bold text-warning">30,000₮</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Дансны мэдээлэл -->
+        <div class="bank-box mb-4">
+            <div class="small text-secondary mb-1">Шилжүүлэх данс (Хаан Банк):</div>
+            <div class="fw-bold fs-5 text-white">5000000000</div>
+            <div class="small text-light">Хүлээн авагч: <b>Таны Нэр</b></div>
+            <div class="small text-warning mt-1">Гүйлгээний утга дээр: <b>{{ session.get('username') }}</b> гэж бичнэ үү.</div>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label class="form-label small text-secondary">Сонгосон багц / Хэлбэр</label>
+                <select name="method" class="form-select bg-dark text-white border-secondary" required>
+                    <option value="1 Сар - 4,000₮">1 Сар — 4,000₮</option>
+                    <option value="3 Сар - 12,000₮">3 Сар — 12,000₮</option>
+                    <option value="6 Сар - 20,000₮">6 Сар — 20,000₮</option>
+                    <option value="1 Жил - 30,000₮">1 Жил — 30,000₮</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label small text-secondary">Төлбөр төлсөн баримтын зураг (Screenshot)</label>
+                <input type="file" name="proof" accept="image/*" class="form-control bg-dark text-white border-secondary" required>
+            </div>
+
+            <button type="submit" class="btn btn-purple w-100 py-2">✅ Баримт илгээх</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
