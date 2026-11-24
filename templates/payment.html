@@ -10,10 +10,25 @@
     }
     .plan-box {
         background: #1a1a2e;
-        border: 1px solid rgba(157, 78, 221, 0.25);
+        border: 2px solid rgba(157, 78, 221, 0.25);
         border-radius: 12px;
-        padding: 12px;
+        padding: 12px 8px;
         text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .plan-box:hover {
+        border-color: #9d4edd;
+        transform: translateY(-2px);
+    }
+    .plan-box.selected {
+        background: linear-gradient(135deg, rgba(114,9,183,0.45), rgba(67,97,238,0.35));
+        border-color: #ffb703;
+        box-shadow: 0 0 15px rgba(255, 183, 3, 0.25);
+    }
+    .plan-vip {
+        background: linear-gradient(135deg, rgba(114,9,183,0.25), rgba(255,183,3,0.12));
     }
     .bank-box {
         background: rgba(114, 9, 183, 0.12);
@@ -27,33 +42,41 @@
     <a href="{{ url_for('movie', mid=movie['id']) }}" class="btn btn-dark-glass btn-sm mb-3">← Буцах</a>
 
     <div class="pay-card">
-        <h4 class="fw-bold mb-1">💳 VIP эрх идэвхжүүлэх</h4>
-        <p class="text-secondary small mb-3">Кино: <b class="text-white">{{ movie['title'] }}</b></p>
+        <h4 class="fw-bold mb-1">💳 Эрх идэвхжүүлэх</h4>
+        <p class="text-secondary small mb-3">Сонгосон кино: <b class="text-white">{{ movie['title'] }}</b></p>
 
-        <!-- Үнийн тариф -->
+        <div class="small text-secondary mb-2">👇 Доорх багцуудаас дарж сонгоно уу:</div>
+
+        <!-- Дарахад сонгогддог мөнгөн дүнгийн хайрцгууд -->
         <div class="row g-2 mb-3">
             <div class="col-6">
-                <div class="plan-box">
-                    <div class="small text-secondary">1 Сар</div>
-                    <div class="fw-bold text-warning">4,000₮</div>
+                <div class="plan-box" onclick="selectPlan(this, '1 Кино - 3,500₮')">
+                    <div class="small text-secondary">Зөвхөн 1 Кино</div>
+                    <div class="fw-bold fs-5 text-info">3,500₮</div>
                 </div>
             </div>
             <div class="col-6">
-                <div class="plan-box">
-                    <div class="small text-secondary">3 Сар</div>
-                    <div class="fw-bold text-warning">12,000₮</div>
+                <div class="plan-box selected" onclick="selectPlan(this, '1 Сар - 10,000₮')">
+                    <div class="small text-secondary">1 Сар (Бүх кино)</div>
+                    <div class="fw-bold fs-5 text-warning">10,000₮</div>
                 </div>
             </div>
             <div class="col-6">
-                <div class="plan-box">
-                    <div class="small text-secondary">6 Сар</div>
-                    <div class="fw-bold text-warning">20,000₮</div>
+                <div class="plan-box" onclick="selectPlan(this, '3 Сар - 15,000₮')">
+                    <div class="small text-secondary">3 Сар (Бүх кино)</div>
+                    <div class="fw-bold fs-5 text-warning">15,000₮</div>
                 </div>
             </div>
             <div class="col-6">
-                <div class="plan-box">
-                    <div class="small text-secondary">1 Жил</div>
-                    <div class="fw-bold text-warning">30,000₮</div>
+                <div class="plan-box" onclick="selectPlan(this, '6 Сар - 20,000₮')">
+                    <div class="small text-secondary">6 Сар (Бүх кино)</div>
+                    <div class="fw-bold fs-5 text-warning">20,000₮</div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="plan-box plan-vip" onclick="selectPlan(this, 'VIP Хязгааргүй - 30,000₮')">
+                    <div class="small text-light">👑 VIP — Бүх кино хязгааргүй үзэх эрх</div>
+                    <div class="fw-bold fs-4 text-warning">30,000₮</div>
                 </div>
             </div>
         </div>
@@ -70,14 +93,11 @@
         </div>
 
         <form method="POST">
-            <div class="mb-4">
-                <label class="form-label small text-secondary">Шилжүүлсэн багцаа сонгоно уу</label>
-                <select name="method" class="form-select bg-dark text-white border-secondary py-2" required>
-                    <option value="1 Сар - 4,000₮">1 Сар — 4,000₮</option>
-                    <option value="3 Сар - 12,000₮">3 Сар — 12,000₮</option>
-                    <option value="6 Сар - 20,000₮">6 Сар — 20,000₮</option>
-                    <option value="1 Жил - 30,000₮">1 Жил — 30,000₮</option>
-                </select>
+            <input type="hidden" name="method" id="selectedMethodInput" value="1 Сар - 10,000₮">
+            
+            <div class="text-center mb-3">
+                <span class="small text-secondary">Сонгосон багц: </span>
+                <span id="selectedMethodText" class="fw-bold text-warning">1 Сар - 10,000₮</span>
             </div>
 
             <button type="submit" class="btn btn-purple w-100 py-2 fs-6">🔄 Төлбөр шалгах</button>
@@ -87,4 +107,13 @@
         </form>
     </div>
 </div>
+
+<script>
+    function selectPlan(element, value) {
+        document.querySelectorAll('.plan-box').forEach(box => box.classList.remove('selected'));
+        element.classList.add('selected');
+        document.getElementById('selectedMethodInput').value = value;
+        document.getElementById('selectedMethodText').innerText = value;
+    }
+</script>
 {% endblock %}
