@@ -18,7 +18,7 @@
     }
     .form-control:focus, .form-select:focus {
         background-color: #222632;
-        border-color: #ff2a5f;
+        border-color: #9d4edd;
         color: #ffffff;
         box-shadow: none;
     }
@@ -30,14 +30,65 @@
         color: #adb5bd;
         margin-bottom: 5px;
     }
+    .btn-submit-movie {
+        background: linear-gradient(90deg, #7209b7, #4361ee);
+        color: #ffffff !important;
+        font-weight: 700;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 24px;
+        white-space: nowrap;
+    }
 </style>
 
 <div class="container mt-3 pb-5">
     <h3 class="fw-bold mb-4">⚙️ Админ удирдлага</h3>
 
+    <!-- Төлбөр шалгах хүсэлтүүд (Дээд талд нь гаргалаа) -->
+    <div class="admin-card">
+        <h5 class="fw-bold mb-3 text-warning">💳 Төлбөр шалгах хүсэлтүүд</h5>
+        {% if payments %}
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+                <thead>
+                    <tr class="text-secondary small">
+                        <th>Гүйлгээний утга (Нэр)</th>
+                        <th>Сонгосон багц</th>
+                        <th>Төлөв</th>
+                        <th>Үйлдэл</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td class="fw-bold text-info">{{ p['username'] }}</td>
+                        <td class="fw-semibold">{{ p['method'] }}</td>
+                        <td>
+                            {% if p['status'] == 'approved' %}
+                                <span class="badge bg-success">Батлагдсан</span>
+                            {% elif p['status'] == 'rejected' %}
+                                <span class="badge bg-danger">Татгалзсан</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Шалгуулахаар илгээсэн</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('payment_action', pid=p['id'], action='approve') }}" class="btn btn-success btn-sm">✅ Батлах</a>
+                            <a href="{{ url_for('payment_action', pid=p['id'], action='reject') }}" class="btn btn-outline-danger btn-sm">Цуцлах</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="text-secondary mb-0">Одоогоор төлбөр шалгах хүсэлт алга байна.</p>
+        {% endif %}
+    </div>
+
     <!-- Кино нэмэх хэсэг -->
     <div class="admin-card">
-        <h5 class="fw-bold mb-3 text-danger">➕ Шинэ кино нэмэх</h5>
+        <h5 class="fw-bold mb-3" style="color: #9d4edd;">➕ Шинэ кино нэмэх</h5>
         <form action="{{ url_for('add_movie') }}" method="POST" enctype="multipart/form-data">
             <div class="row g-3">
                 <div class="col-md-6">
@@ -46,7 +97,16 @@
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Ангилал</label>
-                    <input type="text" name="category" class="form-control" placeholder="Хайр дурлал, түүхэн, тулаант...">
+                    <select name="category" class="form-select">
+                        <option value="Action">Action</option>
+                        <option value="Comedy">Comedy</option>
+                        <option value="Drama">Drama</option>
+                        <option value="Thriller">Thriller</option>
+                        <option value="Horror">Horror</option>
+                        <option value="Anime">Anime</option>
+                        <option value="Series">Series</option>
+                        <option value="Бусад">Бусад</option>
+                    </select>
                 </div>
                 <div class="col-12">
                     <label class="form-label">Тайлбар</label>
@@ -59,82 +119,30 @@
                 <div class="col-md-6">
                     <label class="form-label">Видео оруулах хэлбэр</label>
                     <select name="source_type" class="form-select">
+                        <option value="url">Шууд видео линк (Google Drive / MP4 / Embed)</option>
                         <option value="youtube">YouTube embed URL</option>
-                        <option value="url">Шууд видео линк (MP4 / Embed)</option>
                         <option value="file">Файл хуулах (MP4)</option>
                     </select>
                 </div>
                 <div class="col-md-8">
                     <label class="form-label">Видео холбоос (эсвэл доороос файл сонгоно)</label>
-                    <input type="text" name="source" class="form-control" placeholder="https://youtube.com...">
+                    <input type="text" name="source" class="form-control" placeholder="https://...">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Видео файл (хэрэв файл хуулах бол)</label>
-                    <input type="file" name="video" class="form-control">
+                    <input type="file" name="video" class="form-control" accept="video/mp4,video/*">
                 </div>
-                <div class="col-12 d-flex justify-content-between align-items-center mt-3">
+                <div class="col-12 d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" name="paid" id="paidCheck">
                         <label class="form-check-label text-warning fw-semibold" for="paidCheck">
                             👑 Төлбөртэй (VIP) кино болгох
                         </label>
                     </div>
-                    <button type="submit" class="btn btn-modern px-4">Кино нэмэх</button>
+                    <button type="submit" class="btn-submit-movie">✅ Кино нэмэх</button>
                 </div>
             </div>
         </form>
-    </div>
-
-    <!-- Төлбөрийн хүсэлтүүд -->
-    <div class="admin-card">
-        <h5 class="fw-bold mb-3 text-warning">💳 Төлбөрийн хүсэлтүүд</h5>
-        {% if payments %}
-        <div class="table-responsive">
-            <table class="table table-dark table-hover align-middle mb-0">
-                <thead>
-                    <tr class="text-secondary small">
-                        <th>Хэрэглэгч</th>
-                        <th>Кино</th>
-                        <th>Хэлбэр</th>
-                        <th>Баримт</th>
-                        <th>Төлөв</th>
-                        <th>Үйлдэл</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in payments %}
-                    <tr>
-                        <td class="fw-bold">{{ p['username'] }}</td>
-                        <td>{{ p['title'] }}</td>
-                        <td>{{ p['method'] }}</td>
-                        <td>
-                            {% if p['proof'] %}
-                                <a href="{{ url_for('uploaded', name=p['proof']) }}" target="_blank" class="btn btn-glass btn-sm">Зураг үзэх</a>
-                            {% else %}
-                                <span class="text-muted small">Байхгүй</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if p['status'] == 'approved' %}
-                                <span class="badge bg-success">Батлагдсан</span>
-                            {% elif p['status'] == 'rejected' %}
-                                <span class="badge bg-danger">Татгалзсан</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Хүлээгдэж буй</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a href="{{ url_for('payment_action', pid=p['id'], action='approve') }}" class="btn btn-success btn-sm">Батлах</a>
-                            <a href="{{ url_for('payment_action', pid=p['id'], action='reject') }}" class="btn btn-outline-danger btn-sm">Цуцлах</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-            <p class="text-secondary mb-0">Одоогоор төлбөрийн хүсэлт алга байна.</p>
-        {% endif %}
     </div>
 
     <!-- Нэмэгдсэн кинонууд -->
