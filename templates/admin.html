@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block content %}
 
@@ -6,40 +5,46 @@
 .admin-card {
     background: #141421;
     border: 1px solid rgba(255,255,255,.08);
-    border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 22px;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 18px;
 }
 .admin-title {
     color: #b98aff;
     font-weight: 700;
 }
-.table {
+.admin-card .table {
     color: #eee;
     vertical-align: middle;
+    margin-bottom: 0;
+    font-size: 13px;
 }
-.table th {
+.admin-card .table th {
     color: #b98aff;
     white-space: nowrap;
+    font-size: 12px;
 }
-.table td {
+.admin-card .table td {
     color: #ddd;
 }
-.form-control, .form-select {
+.admin-card .form-control,
+.admin-card .form-select {
     background: #202032;
     color: white;
     border: 1px solid #39394f;
+    font-size: 14px;
 }
-.form-control:focus, .form-select:focus {
+.admin-card .form-control:focus,
+.admin-card .form-select:focus {
     background: #202032;
     color: white;
     border-color: #a855f7;
     box-shadow: none;
 }
-.form-control::placeholder {
+.admin-card .form-control::placeholder {
     color: #999;
 }
-.form-select option {
+.admin-card .form-select option {
     background: #202032;
     color: white;
 }
@@ -52,21 +57,42 @@
     background: #7132b8;
     color: white;
 }
+.admin-card .btn {
+    font-size: 12px;
+}
 .table-responsive {
-    border-radius: 10px;
+    border-radius: 9px;
+}
+.admin-card h5 {
+    font-size: 16px;
+}
+@media (max-width: 768px) {
+    .admin-card {
+        padding: 12px;
+        margin-bottom: 14px;
+    }
+    .admin-heading {
+        font-size: 19px;
+    }
+    .admin-card .table {
+        font-size: 12px;
+    }
+    .admin-card .table th {
+        font-size: 11px;
+    }
 }
 </style>
 
-<div class="container py-4">
+<div class="container py-3">
 
-    <h2 class="admin-title mb-4">⚙️ ADMIN УДИРДЛАГЫН САМБАР</h2>
+    <h2 class="admin-title admin-heading mb-4">⚙️ ADMIN УДИРДЛАГЫН САМБАР</h2>
 
     {% with messages = get_flashed_messages() %}
-    {% if messages %}
-        {% for message in messages %}
-        <div class="alert alert-info">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info py-2">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
     {% endwith %}
 
     <!-- ШИНЭ КИНО НЭМЭХ -->
@@ -77,7 +103,7 @@
               action="{{ url_for('add_movie') }}"
               enctype="multipart/form-data">
 
-            <div class="row g-3">
+            <div class="row g-2">
 
                 <div class="col-md-6">
                     <input class="form-control"
@@ -115,13 +141,11 @@
                 <div class="col-12">
                     <input class="form-control"
                            name="source"
-                           placeholder="Видео URL">
+                           placeholder="Видео URL (URL ашиглах үед)">
                 </div>
 
                 <div class="col-12">
-                    <label class="text-light mb-2">
-                        Видео файл сонгох
-                    </label>
+                    <label class="text-light mb-2">Видео файл сонгох</label>
                     <input class="form-control"
                            type="file"
                            name="video"
@@ -138,8 +162,7 @@
                 </div>
 
                 <div class="col-12">
-                    <button class="btn btn-purple px-4"
-                            type="submit">
+                    <button class="btn btn-purple px-4" type="submit">
                         Кино нэмэх
                     </button>
                 </div>
@@ -165,12 +188,10 @@
                         <th>Үйлдэл</th>
                     </tr>
                 </thead>
-
                 <tbody>
                 {% for user in users %}
                     <tr>
-                        <td>{{ user.username }}</td>
-
+                        <td>{{ user.username|default('Нэргүй') }}</td>
                         <td>
                             {% if user.vip_days|default(0)|int > 0 %}
                                 <span class="badge bg-success">VIP идэвхтэй</span>
@@ -178,13 +199,9 @@
                                 <span class="badge bg-secondary">VIP байхгүй</span>
                             {% endif %}
                         </td>
-
                         <td>{{ user.vip_days|default(0)|int }} хоног</td>
-
                         <td>{{ user.vip_until|default('-') or '-' }}</td>
-
                         <td>{{ user.last_ip|default('-') or '-' }}</td>
-
                         <td>
                             {% if user.is_banned %}
                                 <span class="badge bg-danger">Блоклогдсон</span>
@@ -192,38 +209,29 @@
                                 <span class="badge bg-success">Идэвхтэй</span>
                             {% endif %}
                         </td>
-
                         <td>
                             {% if user.last_ip %}
                                 {% if user.is_banned %}
-                                <form method="POST"
-                                      action="{{ url_for('unban_ip') }}"
-                                      class="d-inline">
-                                    <input type="hidden"
-                                           name="ip"
-                                           value="{{ user.last_ip }}">
-                                    <input type="hidden"
-                                           name="uid"
-                                           value="{{ user.id }}">
-                                    <button class="btn btn-success btn-sm">
-                                        Нээх
-                                    </button>
-                                </form>
+                                    <form method="POST"
+                                          action="{{ url_for('unban_ip') }}"
+                                          class="d-inline">
+                                        <input type="hidden" name="ip" value="{{ user.last_ip }}">
+                                        <input type="hidden" name="uid" value="{{ user.id }}">
+                                        <button class="btn btn-success btn-sm" type="submit">
+                                            Нээх
+                                        </button>
+                                    </form>
                                 {% else %}
-                                <form method="POST"
-                                      action="{{ url_for('ban_ip') }}"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Энэ хэрэглэгчийг блоклох уу?')">
-                                    <input type="hidden"
-                                           name="ip"
-                                           value="{{ user.last_ip }}">
-                                    <input type="hidden"
-                                           name="uid"
-                                           value="{{ user.id }}">
-                                    <button class="btn btn-danger btn-sm">
-                                        Блоклох
-                                    </button>
-                                </form>
+                                    <form method="POST"
+                                          action="{{ url_for('ban_ip') }}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Энэ хэрэглэгчийг блоклох уу?')">
+                                        <input type="hidden" name="ip" value="{{ user.last_ip }}">
+                                        <input type="hidden" name="uid" value="{{ user.id }}">
+                                        <button class="btn btn-danger btn-sm" type="submit">
+                                            Блоклох
+                                        </button>
+                                    </form>
                                 {% endif %}
                             {% endif %}
                         </td>
@@ -257,12 +265,10 @@
                         <th>Үйлдэл</th>
                     </tr>
                 </thead>
-
                 <tbody>
                 {% for payment in payments %}
                     <tr>
                         <td>{{ payment.username|default('-') }}</td>
-
                         <td>
                             {% if payment.request_type == 'vip' %}
                                 <span class="badge bg-warning text-dark">VIP</span>
@@ -270,13 +276,9 @@
                                 <span class="badge bg-info text-dark">Кино үзэх</span>
                             {% endif %}
                         </td>
-
                         <td>{{ payment.plan|default('-') }}</td>
-
                         <td>{{ payment.movie_title|default('-') or '-' }}</td>
-
                         <td>{{ payment.amount|default(0) }}₮</td>
-
                         <td>
                             {% if payment.status == 'approved' %}
                                 <span class="badge bg-success">Зөвшөөрсөн</span>
@@ -286,36 +288,25 @@
                                 <span class="badge bg-warning text-dark">Хүлээгдэж буй</span>
                             {% endif %}
                         </td>
-
-                        <td>
-                            {% if payment.proof %}
-                                {{ payment.proof }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-
+                        <td>{{ payment.proof|default('-') or '-' }}</td>
                         <td>{{ payment.created_at|default('-') }}</td>
-
                         <td>
                             {% if payment.status == 'pending' %}
-                            <form method="POST"
-                                  action="{{ url_for('payment_action', pid=payment.id, action='approve') }}"
-                                  class="d-inline">
-                                <button class="btn btn-success btn-sm"
-                                        type="submit">
-                                    Зөвшөөрөх
-                                </button>
-                            </form>
+                                <form method="POST"
+                                      action="{{ url_for('payment_action', pid=payment.id, action='approve') }}"
+                                      class="d-inline">
+                                    <button class="btn btn-success btn-sm" type="submit">
+                                        Зөвшөөрөх
+                                    </button>
+                                </form>
 
-                            <form method="POST"
-                                  action="{{ url_for('payment_action', pid=payment.id, action='reject') }}"
-                                  class="d-inline">
-                                <button class="btn btn-danger btn-sm"
-                                        type="submit">
-                                    Татгалзах
-                                </button>
-                            </form>
+                                <form method="POST"
+                                      action="{{ url_for('payment_action', pid=payment.id, action='reject') }}"
+                                      class="d-inline">
+                                    <button class="btn btn-danger btn-sm" type="submit">
+                                        Татгалзах
+                                    </button>
+                                </form>
                             {% endif %}
                         </td>
                     </tr>
@@ -344,14 +335,11 @@
                         <th>Үйлдэл</th>
                     </tr>
                 </thead>
-
                 <tbody>
                 {% for movie in movies %}
                     <tr>
                         <td>{{ movie.title }}</td>
-
                         <td>{{ movie.category|default('-') }}</td>
-
                         <td>
                             {% if movie.paid %}
                                 <span class="badge bg-warning text-dark">VIP</span>
@@ -359,15 +347,12 @@
                                 <span class="badge bg-success">Үнэгүй</span>
                             {% endif %}
                         </td>
-
                         <td>{{ movie.source_type|default('-') }}</td>
-
                         <td>
                             <form method="POST"
                                   action="{{ url_for('delete_movie', mid=movie.id) }}"
                                   onsubmit="return confirm('Энэ киног устгах уу?')">
-                                <button class="btn btn-danger btn-sm"
-                                        type="submit">
+                                <button class="btn btn-danger btn-sm" type="submit">
                                     Устгах
                                 </button>
                             </form>
@@ -399,11 +384,10 @@
                         <th>Сүүлд идэвхтэй</th>
                     </tr>
                 </thead>
-
                 <tbody>
                 {% for v in visitors %}
                     <tr>
-                        <td>{{ v.username|default('Зочин') }}</td>
+                        <td>{{ v.username|default('Зочин') or 'Зочин' }}</td>
                         <td>{{ v.ip|default('-') }}</td>
                         <td>{{ v.device|default('-') }}</td>
                         <td>{{ v.browser|default('-') }}</td>
@@ -432,18 +416,14 @@
                         <th>Үйлдэл</th>
                     </tr>
                 </thead>
-
                 <tbody>
                 {% for ip in banned_ips %}
                     <tr>
                         <td>{{ ip }}</td>
                         <td>
-                            <form method="POST"
-                                  action="{{ url_for('unban_ip') }}">
-                                <input type="hidden"
-                                       name="ip"
-                                       value="{{ ip }}">
-                                <button class="btn btn-success btn-sm">
+                            <form method="POST" action="{{ url_for('unban_ip') }}">
+                                <input type="hidden" name="ip" value="{{ ip }}">
+                                <button class="btn btn-success btn-sm" type="submit">
                                     Блок цуцлах
                                 </button>
                             </form>
