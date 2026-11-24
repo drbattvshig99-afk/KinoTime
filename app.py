@@ -1,6 +1,7 @@
 
 import os
 import sqlite3
+import uuid
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -32,12 +33,48 @@ def db():
 
 
 def get_ip():
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return next(iter(forwarded.split(","))).strip()
+    # X-Forwarded-For-г зөвхөн итгэмжлэгдсэн proxy дээр тохируулна.
     return request.remote_addr or "0.0.0.0"
 
 
+# DEVICE AND BROWSER
+def get_device():
+    ua = request.headers.get("User-Agent", "").lower()
+
+    if "ipad" in ua or "tablet" in ua:
+        device = "iPad"
+    elif "iphone" in ua:
+        device = "iPhone"
+    elif "android" in ua:
+        device = "Android"
+    elif "windows" in ua:
+        device = "Windows"
+    elif "macintosh" in ua or "mac os" in ua:
+        device = "Mac"
+    elif "linux" in ua:
+        device = "Linux"
+    else:
+        device = "Unknown"
+
+    if "edg/" in ua:
+        browser = "Edge"
+    elif "opr/" in ua or "opera" in ua:
+        browser = "Opera"
+    elif "samsungbrowser" in ua:
+        browser = "Samsung Internet"
+    elif "chrome/" in ua:
+        browser = "Chrome"
+    elif "firefox/" in ua:
+        browser = "Firefox"
+    elif "safari/" in ua:
+        browser = "Safari"
+    else:
+        browser = "Unknown"
+
+    return device, browser
+
+
+# DATABASE INITIALIZATION
 def init():
     c = db()
 
@@ -85,36 +122,118 @@ def init():
         )
     """)
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS visitors(
-            ip TEXT PRIMARY KEY,
-            username TEXT,
-            last_page TEXT,
-            last_seen TEXT
+    # VISITORS MIGRATION
+    columns = [
+        row["name"]
+        for row in c.execute(
+            "PRAGMA table_info(visitors)"
+        ).fetchall()
+    ]
+
+    if not columns:
+        c.execute("""
+            CREATE TABLE visitors(
+                visitor_id TEXT PRIMARY KEY,
+                ip TEXT,
+                username TEXT,
+                device TEXT,
+                browser TEXT,
+                last_page TEXT,
+                last_seen TEXT
+            )
+        """)
+
+    elif "visitor_id" not in columns:
+        c.execute(
+            "ALTER TABLE visitors RENAME TO visitors_old"
         )
-    """)
+
+        c.execute("""
+            CREATE TABLE visitors(
+                visitor_id TEXT PRIMARY KEY,
+                ip TEXT,
+                username TEXT,
+                device TEXT,
+                browser TEXT,
+                last_page TEXT,
+                last_seen TEXT
+            )
+        """)
+
+        old_rows = c.execute(
+            "SELECT * FROM visitors_old"
+        ).fetchall()
+
+        for row in old_rows:
+            c.execute("""
+                INSERT INTO visitors(
+                    visitor_id, ip, username, device,
+                    browser, last_page, last_seen
+                )
+                VALUES(?,?,?,?,?,?,?)
+            """, (
+                uuid.uuid4().hex,
+                row["ip"],
+                row["username"],
+                "Unknown",
+                "Unknown",
+                row["last_page"],
+                row["last_seen"]
+            ))
+
+        c.execute("DROP TABLE visitors_old")
+
+    else:
+        for col in [
+            "ip TEXT",
+            "username TEXT",
+            "device TEXT",
+            "browser TEXT",
+            "last_page TEXT",
+            "last_seen TEXT"
+        ]:
+            name = col.split()[0]
+            if name not in columns:
+                c.execute(
+                    f"ALTER TABLE visitors ADD COLUMN {col}"
+                )
+
+    # USERS MIGRATION
+    user_columns = [
+        row["name"]
+        for row in c.execute(
+            "PRAGMA table_info(users)"
+        ).fetchall()
+    ]
 
     for col in [
         "vip_until TEXT",
         "last_ip TEXT",
         "is_banned INTEGER DEFAULT 0"
     ]:
-        try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col}")
-        except sqlite3.OperationalError:
-            pass
+        name = col.split()[0]
+        if name not in user_columns:
+            c.execute(
+                f"ALTER TABLE users ADD COLUMN {col}"
+            )
 
+    # DEFAULT ADMIN
     admin = os.environ.get("ADMIN_USERNAME", "admin")
     pw = os.environ.get("ADMIN_PASSWORD", "ChangeMe123!")
 
-    if not c.execute(
+    exists = c.execute(
         "SELECT id FROM users WHERE username=?",
         (admin,)
-    ).fetchone():
-        c.execute(
-            "INSERT INTO users(username,password,is_admin) VALUES(?,?,1)",
-            (admin, generate_password_hash(pw))
-        )
+    ).fetchone()
+
+    if not exists:
+        c.execute("""
+            INSERT INTO users(username,password,is_admin)
+            VALUES(?,?,1)
+        """, (
+            admin,
+            generate_password_hash(pw)
+        ))
 
     c.commit()
     c.close()
@@ -126,6 +245,7 @@ init()
 # VISITOR TRACKING AND BAN CHECK
 @app.before_request
 def track_and_check_ban():
+
     if request.path.startswith("/static"):
         return
 
@@ -133,6 +253,7 @@ def track_and_check_ban():
     c = db()
 
     if not session.get("admin"):
+
         banned = c.execute(
             "SELECT ip FROM banned_ips WHERE ip=?",
             (ip,)
@@ -171,17 +292,41 @@ def track_and_check_ban():
                 c.close()
                 return "Таны бүртгэл хаагдсан байна.", 403
 
+    # НЭГ SESSION = НЭГ VISITOR
+    visitor_id = session.get("visitor_id")
+
+    if not visitor_id:
+        visitor_id = uuid.uuid4().hex
+        session["visitor_id"] = visitor_id
+
+    device, browser = get_device()
+
     uname = session.get("username") or "Зочин"
     now = datetime.utcnow().isoformat()
 
     c.execute("""
-        INSERT INTO visitors(ip, username, last_page, last_seen)
-        VALUES(?,?,?,?)
-        ON CONFLICT(ip) DO UPDATE SET
+        INSERT INTO visitors(
+            visitor_id, ip, username, device,
+            browser, last_page, last_seen
+        )
+        VALUES(?,?,?,?,?,?,?)
+
+        ON CONFLICT(visitor_id) DO UPDATE SET
+            ip=excluded.ip,
             username=excluded.username,
+            device=excluded.device,
+            browser=excluded.browser,
             last_page=excluded.last_page,
             last_seen=excluded.last_seen
-    """, (ip, uname, request.path, now))
+    """, (
+        visitor_id,
+        ip,
+        uname,
+        device,
+        browser,
+        request.path,
+        now
+    ))
 
     if session.get("uid"):
         c.execute(
@@ -218,32 +363,53 @@ def admin_required(f):
 @app.route("/")
 def index():
     c = db()
+
     movies = c.execute(
         "SELECT * FROM movies ORDER BY id DESC"
     ).fetchall()
+
     c.close()
 
-    return render_template("index.html", movies=movies)
+    return render_template(
+        "index.html",
+        movies=movies
+    )
 
 
 # REGISTER
 @app.route("/register", methods=["GET", "POST"])
 def register():
+
     if request.method == "POST":
-        u = request.form.get("username", "").strip()
-        p = request.form.get("password", "")
+
+        u = request.form.get(
+            "username", ""
+        ).strip()
+
+        p = request.form.get(
+            "password", ""
+        )
 
         if len(u) < 3 or len(p) < 8:
-            flash("Нэр 3-аас дээш, нууц үг 8-аас дээш тэмдэгт байна.")
+            flash(
+                "Нэр 3-аас дээш, нууц үг 8-аас дээш тэмдэгт байна."
+            )
             return redirect(url_for("register"))
 
         c = db()
 
         try:
-            c.execute(
-                "INSERT INTO users(username,password,last_ip) VALUES(?,?,?)",
-                (u, generate_password_hash(p), get_ip())
-            )
+            c.execute("""
+                INSERT INTO users(
+                    username, password, last_ip
+                )
+                VALUES(?,?,?)
+            """, (
+                u,
+                generate_password_hash(p),
+                get_ip()
+            ))
+
             c.commit()
 
             flash("Бүртгэл амжилттай. Нэвтэрнэ үү.")
@@ -255,13 +421,18 @@ def register():
         finally:
             c.close()
 
-    return render_template("auth.html", mode="register")
+    return render_template(
+        "auth.html",
+        mode="register"
+    )
 
 
 # LOGIN
 @app.route("/login", methods=["GET", "POST"])
 def login():
+
     if request.method == "POST":
+
         c = db()
 
         u = c.execute(
@@ -275,19 +446,26 @@ def login():
             u["password"],
             request.form.get("password", "")
         ):
+
             if u["is_banned"]:
                 flash("Таны бүртгэл хаагдсан байна.")
                 return redirect(url_for("login"))
 
+            session.clear()
+
             session["uid"] = u["id"]
             session["username"] = u["username"]
             session["admin"] = bool(u["is_admin"])
+            session["visitor_id"] = uuid.uuid4().hex
 
             return redirect(url_for("index"))
 
         flash("Нэвтрэх нэр эсвэл нууц үг буруу.")
 
-    return render_template("auth.html", mode="login")
+    return render_template(
+        "auth.html",
+        mode="login"
+    )
 
 
 # LOGOUT
@@ -300,6 +478,7 @@ def logout():
 # MOVIE PAGE
 @app.route("/movie/<int:mid>")
 def movie(mid):
+
     c = db()
 
     m = c.execute(
@@ -310,10 +489,12 @@ def movie(mid):
     unlocked = False
 
     if m:
+
         if not m["paid"] or session.get("admin"):
             unlocked = True
 
         elif session.get("uid"):
+
             u = c.execute(
                 "SELECT vip_until FROM users WHERE id=?",
                 (session["uid"],)
@@ -334,7 +515,10 @@ def movie(mid):
                     WHERE user_id=?
                     AND movie_id=?
                     AND status='approved'
-                """, (session["uid"], mid)).fetchone()
+                """, (
+                    session["uid"],
+                    mid
+                )).fetchone()
 
                 if single:
                     unlocked = True
@@ -355,6 +539,7 @@ def movie(mid):
 @app.route("/payment/<int:mid>", methods=["GET", "POST"])
 @login_required
 def payment(mid):
+
     c = db()
 
     m = c.execute(
@@ -369,6 +554,7 @@ def payment(mid):
         }
 
     if request.method == "POST":
+
         method = request.form.get(
             "method",
             "1 Сар - 10,000₮"
@@ -397,7 +583,10 @@ def payment(mid):
 
     c.close()
 
-    return render_template("payment.html", movie=m)
+    return render_template(
+        "payment.html",
+        movie=m
+    )
 
 
 # ADMIN PANEL
@@ -405,6 +594,7 @@ def payment(mid):
 @login_required
 @admin_required
 def admin():
+
     c = db()
 
     movies = c.execute(
@@ -413,11 +603,20 @@ def admin():
 
     payments = c.execute("""
         SELECT p.*,
-        COALESCE(u.username, 'Хэрэглэгч #' || p.user_id) AS username,
+        COALESCE(
+            u.username,
+            'Хэрэглэгч #' || p.user_id
+        ) AS username,
         COALESCE(m.title, 'VIP Эрх') AS title
+
         FROM payments p
-        LEFT JOIN users u ON u.id = p.user_id
-        LEFT JOIN movies m ON m.id = p.movie_id
+
+        LEFT JOIN users u
+        ON u.id = p.user_id
+
+        LEFT JOIN movies m
+        ON m.id = p.movie_id
+
         ORDER BY p.id DESC
     """).fetchall()
 
@@ -430,7 +629,8 @@ def admin():
     ).isoformat()
 
     visitors = c.execute("""
-        SELECT * FROM visitors
+        SELECT *
+        FROM visitors
         WHERE last_seen > ?
         ORDER BY last_seen DESC
     """, (cutoff,)).fetchall()
@@ -459,10 +659,15 @@ def admin():
 @login_required
 @admin_required
 def ban_ip():
-    ip = request.form.get("ip", "").strip()
+
+    ip = request.form.get(
+        "ip", ""
+    ).strip()
+
     uid = request.form.get("uid")
 
     if ip and ip != get_ip():
+
         c = db()
 
         c.execute("""
@@ -495,7 +700,11 @@ def ban_ip():
 @login_required
 @admin_required
 def unban_ip():
-    ip = request.form.get("ip", "").strip()
+
+    ip = request.form.get(
+        "ip", ""
+    ).strip()
+
     uid = request.form.get("uid")
 
     c = db()
@@ -525,23 +734,44 @@ def unban_ip():
 @login_required
 @admin_required
 def add_movie():
-    title = request.form.get("title", "").strip()
+
+    title = request.form.get(
+        "title", ""
+    ).strip()
+
     st = request.form.get("source_type")
-    source = request.form.get("source", "").strip()
+
+    source = request.form.get(
+        "source", ""
+    ).strip()
+
     upload = request.files.get("video")
 
     if st == "file" and upload and upload.filename:
+
         name = secure_filename(upload.filename)
 
         if not name:
             flash("Файлын нэр буруу байна.")
             return redirect(url_for("admin"))
 
-        upload.save(os.path.join(UPLOAD, name))
-        source = url_for("uploaded", name=name)
+        # Ижил нэртэй файлыг давхар дарж бичихээс сэргийлнэ.
+        ext = os.path.splitext(name)[1]
+        name = uuid.uuid4().hex + ext
+
+        upload.save(
+            os.path.join(UPLOAD, name)
+        )
+
+        source = url_for(
+            "uploaded",
+            name=name
+        )
 
     if not title or not source:
-        flash("Киноны нэр болон видео эх сурвалж шаардлагатай.")
+        flash(
+            "Киноны нэр болон видео эх сурвалж шаардлагатай."
+        )
         return redirect(url_for("admin"))
 
     c = db()
@@ -601,7 +831,9 @@ def payment_action(pid, action):
 
     if p["status"] != "pending":
         c.close()
-        flash("Энэ төлбөр өмнө нь шийдвэрлэгдсэн байна.")
+        flash(
+            "Энэ төлбөр өмнө нь шийдвэрлэгдсэн байна."
+        )
         return redirect(url_for("admin"))
 
     status = (
@@ -616,9 +848,11 @@ def payment_action(pid, action):
     )
 
     if action == "approve":
+
         method = p["method"] or ""
 
         if "1 Кино" not in method:
+
             days = 30
 
             if "3 Сар" in method:
@@ -674,6 +908,7 @@ def payment_action(pid, action):
 @login_required
 @admin_required
 def delete_movie(mid):
+
     c = db()
 
     c.execute(
