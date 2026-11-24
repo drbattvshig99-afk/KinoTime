@@ -19,7 +19,7 @@
         background: rgba(114, 9, 183, 0.12);
         border: 1px dashed #9d4edd;
         border-radius: 12px;
-        padding: 15px;
+        padding: 16px;
     }
 </style>
 
@@ -64,13 +64,15 @@
             <div class="small text-light">IBAN: <b class="text-white">45000500</b></div>
             <div class="fw-bold fs-5 text-white my-1">5193119236</div>
             <div class="small text-light">Хүлээн авагч: <b>BATTUSHIG MUNKHZAYA</b></div>
-            <div class="small text-warning mt-2">Гүйлгээний утга дээр: <b>{{ session.get('username') }}</b> гэж бичнэ үү.</div>
+            <div class="small text-warning mt-2">
+                ⚠️ Гүйлгээний утга дээр заавал: <b class="text-white text-decoration-underline">{{ session.get('username') }}</b> гэж бичнэ үү.
+            </div>
         </div>
 
-        <form method="POST" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label class="form-label small text-secondary">Сонгосон багц</label>
-                <select name="method" class="form-select bg-dark text-white border-secondary" required>
+        <form method="POST">
+            <div class="mb-4">
+                <label class="form-label small text-secondary">Шилжүүлсэн багцаа сонгоно уу</label>
+                <select name="method" class="form-select bg-dark text-white border-secondary py-2" required>
                     <option value="1 Сар - 4,000₮">1 Сар — 4,000₮</option>
                     <option value="3 Сар - 12,000₮">3 Сар — 12,000₮</option>
                     <option value="6 Сар - 20,000₮">6 Сар — 20,000₮</option>
@@ -78,12 +80,10 @@
                 </select>
             </div>
 
-            <div class="mb-4">
-                <label class="form-label small text-secondary">Төлбөр төлсөн баримтын зураг (Screenshot)</label>
-                <input type="file" name="proof" accept="image/*" class="form-control bg-dark text-white border-secondary" required>
-            </div>
-
-            <button type="submit" class="btn btn-purple w-100 py-2">✅ Баримт илгээх</button>
+            <button type="submit" class="btn btn-purple w-100 py-2 fs-6">🔄 Төлбөр шалгах</button>
+            <p class="text-secondary text-center small mt-2 mb-0">
+                Гүйлгээ хийсний дараа дээрх товчийг дарна уу. Админ шалгаад эрхийг тань шууд нээх болно.
+            </p>
         </form>
     </div>
 </div>
