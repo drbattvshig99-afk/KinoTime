@@ -1,1 +1,77 @@
-{% extends "base.html" %}{% block content %}<a href="/">← Нүүр</a><div class="panel"><h1>{{movie.title}}</h1><p>{{movie.description}}</p><p class="muted">{{movie.category}}</p>{% if unlocked %}{% if movie.source_type=='youtube' %}<div class="video"><iframe src="{{movie.source}}" allowfullscreen></iframe></div>{% elif movie.source_type=='embed' %}<div class="video"><iframe src="{{movie.source}}" allowfullscreen></iframe></div>{% else %}<video class="video" controls src="{{movie.source}}"></video>{% endif %}{% elif movie.paid %}<h3>Энэ кино төлбөртэй</h3><p>Төлбөрөө хийж, баримтаа илгээн үзэх эрхээ нээлгээрэй.</p><a class="button" href="/payment/{{movie.id}}">Төлбөр төлөх</a>{% else %}<p>Үзэхийн тулд нэвтэрнэ үү.</p><a href="/login">Нэвтрэх</a>{% endif %}</div>{% endblock %}
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .player-wrapper {
+        background: #000;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        aspect-ratio: 16 / 9;
+        width: 100%;
+    }
+    .locked-box {
+        background: linear-gradient(135deg, #161624, #1f1635);
+        border: 1px solid rgba(157, 78, 221, 0.3);
+        border-radius: 16px;
+        padding: 40px 20px;
+        text-align: center;
+    }
+    .detail-card {
+        background: #12121e;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 20px;
+    }
+</style>
+
+<div class="container mt-3 pb-5">
+    <a href="{{ url_for('index') }}" class="btn btn-dark-glass btn-sm mb-3">← Буцах</a>
+
+    {% if unlocked %}
+        <div class="player-wrapper mb-4">
+            {% if movie['source_type'] == 'file' %}
+                <video controls autoplay class="w-100 h-100">
+                    <source src="{{ movie['source'] }}" type="video/mp4">
+                </video>
+            {% else %}
+                <iframe src="{{ movie['source'] }}" class="w-100 h-100 border-0" allowfullscreen></iframe>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="locked-box mb-4">
+            <div style="font-size: 2.5rem;" class="mb-2">👑</div>
+            <h4 class="fw-bold">Энэ нь VIP төлбөртэй кино байна</h4>
+            <p class="text-secondary small mx-auto" style="max-width: 450px;">
+                Энэхүү киног үзэхийн тулд нэвтэрч ороод төлбөрөө баталгаажуулна уу.
+            </p>
+            {% if session.get('uid') %}
+                <a href="{{ url_for('payment', mid=movie['id']) }}" class="btn btn-purple px-4 mt-2">💳 Эрх нээлгэх / Төлбөр төлөх</a>
+            {% else %}
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                    <a href="{{ url_for('login') }}" class="btn btn-purple px-4">Нэвтрэх</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-dark-glass px-4">Бүртгүүлэх</a>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="detail-card">
+        <div class="d-flex gap-3">
+            <img src="{{ movie['poster'] or 'https://placeholder.com' }}" class="rounded-3 d-none d-sm-block" style="width: 110px; height: 160px; object-fit: cover;">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge" style="background: #7209b7;">{{ movie['category'] }}</span>
+                    {% if movie['paid'] %}
+                        <span class="badge bg-warning text-dark">VIP</span>
+                    {% else %}
+                        <span class="badge bg-success">Үнэгүй</span>
+                    {% endif %}
+                </div>
+                <h4 class="fw-bold mb-2">{{ movie['title'] }}</h4>
+                <p class="text-secondary small mb-0">{{ movie['description'] or 'Тайлбар оруулаагүй байна.' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
