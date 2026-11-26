@@ -367,10 +367,13 @@ body {
 
                 <div class="poster-card">
 
+                    <!-- POSTER IMAGE WITH FALLBACK -->
+
                     <img
                         src="{{ m['poster'] or 'https://placehold.co/400x600/171722/ffffff?text=KINOTIME' }}"
                         alt="{{ m['title'] }}"
                         loading="lazy"
+                        onerror="this.onerror=null;this.src='https://placehold.co/400x600/171722/ffffff?text=KINOTIME';"
                     >
 
                     <div class="poster-gradient"></div>
